@@ -1,0 +1,7 @@
+build/
+reference/xroar/
+reference/asm6809/
+tools/refgen/*.exe
+tools/refgen/*.obj
+Diagnostics/*.bin
+Diagnostics/*.lst

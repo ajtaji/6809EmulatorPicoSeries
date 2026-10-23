@@ -1,0 +1,6 @@
+#CLOCK_KHZ = 200000
+#CPU_TIMING = 1
+#CPU_ASM_TAIL = 0
+XIncludeFile "verify_body.pico"
+XIncludeFile "vectors_i.pico"
+XIncludeFile "schwotzer_data.pico"

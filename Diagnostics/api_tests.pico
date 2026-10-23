@@ -1,0 +1,206 @@
+
+Global ApiFail.i, R.i, S0.i, AWas.i
+Procedure Check(ok.i, *what.i)
+  If ok = 0
+    ApiFail = ApiFail + 1
+    Say("API FAIL: ") : Say(*what) : Say(" PC=") : Num(CpuPC) : Say(" A=") : Num(CpuA)
+    Say(" S=") : Num(CpuS) : Say(" CC=") : Num(CpuGetCC()) : Eol()
+  EndIf
+EndProcedure
+Procedure Poke6809(adr.i, b0.i, b1.i, b2.i, b3.i)
+  Mem(adr) = b0 : Mem(adr + 1) = b1 : Mem(adr + 2) = b2 : Mem(adr + 3) = b3
+EndProcedure
+Procedure Steps(k.i)
+  Protected j.i
+  For j = 1 To k
+    CpuRun(1)
+  Next
+EndProcedure
+Procedure Fresh(pc.i)
+  CpuStopped = 0 : CpuWaiting = 0 : CpuSyncing = 0 : CpuNmiPending = 0 : CpuNmiArmed = 1
+  CpuIrqLine = 0 : CpuFirqLine = 0 : IoRaiseIrq = 0
+  CpuSetCC($50) : CpuA = 0 : CpuB = 0 : CpuDPage = 0
+  CpuX = 0 : CpuY = 0 : CpuU = $6000 : CpuS = $7000 : CpuPC = pc
+EndProcedure
+Procedure ApiTests()
+  ApiFail = 0
+  For I = 0 To 65535
+    Mem(I) = 0
+  Next
+  CpuMapPages(0, 256, @Mem(0), 1)
+  ; handlers: IRQ $2000, FIRQ $2080, NMI $2100, SWI $2180 - each INCA then BRA *
+  Mem($FFF8) = $20 : Mem($FFF9) = $00
+  Mem($FFF6) = $20 : Mem($FFF7) = $80
+  Mem($FFFC) = $21 : Mem($FFFD) = $00
+  Mem($FFFA) = $21 : Mem($FFFB) = $80
+  Poke6809($2000, $4C, $20, $FE, 0) : Poke6809($2080, $4C, $20, $FE, 0)
+  Poke6809($2100, $4C, $20, $FE, 0) : Poke6809($2180, $4C, $20, $FE, 0)
+  ; empty and negative budgets
+  Fresh($1000) : Mem($1000) = $12
+  Check(Bool(CpuRun(0) = 0 And CpuRun(-5) = 0 And CpuPC = $1000), "zero/negative budget")
+  ; undocumented opcodes stop before executing, page 1 and page 2
+  Fresh($1500) : Mem($1500) = $01
+  R = CpuRun(10)
+  Check(Bool(R = 0 And CpuStopped = 1 And CpuBadOpcode = $01 And CpuPC = $1500), "illegal page 1")
+  Check(Bool(CpuRun(10) = 0 And CpuPC = $1500), "stays stopped")
+  Fresh($1600) : Mem($1600) = $10 : Mem($1601) = $00
+  R = CpuRun(10)
+  Check(Bool(R = 0 And CpuStopped = 1 And CpuBadOpcode = $1000 And CpuPC = $1600), "illegal page 2")
+  ; reset
+  Mem($FFFE) = $12 : Mem($FFFF) = $34 : CpuDPage = $5500 : CpuSetCC(0)
+  CpuReset()
+  Check(Bool(CpuPC = $1234 And CpuDPage = 0 And (CpuGetCC() & $50) = $50 And CpuStopped = 0 And CpuNmiArmed = 0), "reset")
+  ; NMI is ignored until S is loaded, then taken: LDS #$7000 / NOP
+  CpuPC = $1300 : Poke6809($1300, $10, $CE, $70, $00) : Mem($1304) = $12
+  CpuNmi()
+  Check(Bool(CpuNmiPending = 0), "NMI disarmed after reset")
+  Steps(1)
+  CpuNmi() : AWas = CpuA
+  Steps(1)
+  Check(Bool(CpuPC = $2101 And CpuS = $7000 - 12 And CpuA = ((AWas + 1) & 255) And (CpuGetCC() & $D0) = $D0), "NMI after LDS")
+  Check(Bool(Mem($7000 - 2) = $13 And Mem($7000 - 1) = $04), "NMI stacked PC")
+  ; bus hooks, ROM page, a word straddling I/O and RAM:
+  ; LDA $4012 / STA $4034 / LDD $40FF / STA $5000
+  Fresh($1800)
+  CpuMapIo($40, 1)
+  CpuMapPages($50, 1, @Mem($5000), 0)
+  Mem($4100) = $77 : Mem($5000) = $99
+  Poke6809($1800, $B6, $40, $12, $B7) : Poke6809($1804, $40, $34, $FC, $40)
+  Poke6809($1808, $FF, $B7, $50, $00) : Poke6809($180C, $20, $FE, 0, 0)
+  IoReads = 0 : IoWrites = 0
+  Steps(1)
+  Check(Bool(CpuA = $48 And IoReads = 1 And IoLastAdr = $4012), "I/O read")
+  Steps(1)
+  Check(Bool(IoWrites = 1 And IoLastAdr = $4034 And IoLastVal = $48), "I/O write")
+  Steps(1)
+  Check(Bool(CpuA = $A5 And CpuB = $77 And IoReads = 2), "word across I/O and RAM")
+  Steps(1)
+  Check(Bool(Mem($5000) = $99 And CpuPC = $180C), "ROM page write discarded")
+  CpuMapPages(0, 256, @Mem(0), 1)
+  ; an IRQ raised inside a bus write is taken at the next instruction boundary
+  ; ANDCC #$EF / STA $4000 / NOP / BRA *
+  Fresh($1000) : CpuMapIo($40, 1)
+  Poke6809($1000, $1C, $EF, $B7, $40) : Poke6809($1004, $00, $12, $20, $FE)
+  IoRaiseIrq = 1 : AWas = CpuA
+  R = CpuRun(200)
+  CompilerIf #CPU_TIMING = 1
+    Check(Bool(R >= 200 And R < 210), "timed window length")
+  CompilerElse
+    Check(Bool(R = 200), "untimed window length")
+  CompilerEndIf
+  Check(Bool(CpuPC = $2001 And CpuA = ((AWas + 1) & 255) And CpuS = $7000 - 12), "IRQ from a bus write")
+  Check(Bool(Mem($7000 - 2) = $10 And Mem($7000 - 1) = $05), "IRQ stacked the next PC")
+  IoRaiseIrq = 0
+  CpuMapPages(0, 256, @Mem(0), 1)
+  ; FIRQ stacks PC and CC with E clear
+  Fresh($1000) : CpuSetCC($10) : Mem($1000) = $12 : Mem($1001) = $20 : Mem($1002) = $FE
+  CpuFirqLine = 1
+  Steps(1)
+  Check(Bool(CpuPC = $2081 And CpuS = $7000 - 3 And (Mem($7000 - 3) & $80) = 0 And (CpuGetCC() & $50) = $50), "FIRQ")
+  ; CWAI waits, burning whole windows; the IRQ that ends it does not stack again
+  Fresh($1100) : Poke6809($1100, $3C, $EF, $12, $20)
+  R = CpuRun(100)
+  Check(Bool(R = 100 And CpuWaiting = 1 And CpuS = $7000 - 12), "CWAI waits")
+  R = CpuRun(100)
+  Check(Bool(R = 100 And CpuWaiting = 1), "CWAI still waiting")
+  CpuIrqLine = 1 : AWas = CpuA
+  Steps(1)
+  Check(Bool(CpuWaiting = 0 And CpuPC = $2001 And CpuS = $7000 - 12 And CpuA = ((AWas + 1) & 255)), "CWAI ended by IRQ")
+  ; SYNC: a masked line ends the wait without an interrupt
+  Fresh($1200) : Poke6809($1200, $13, $4C, $20, $FE)
+  R = CpuRun(50)
+  Check(Bool(R = 50 And CpuSyncing = 1), "SYNC waits")
+  CpuFirqLine = 1 : AWas = CpuA
+  Steps(1)
+  Check(Bool(CpuSyncing = 0 And CpuPC = $1202 And CpuS = $7000 And CpuA = ((AWas + 1) & 255)), "SYNC ended by a masked line")
+  ; self-modifying code: LDA #$4C / STA $1406 / NOP / NOP(-> INCA) / BRA *
+  Fresh($1400)
+  Poke6809($1400, $86, $4C, $B7, $14) : Poke6809($1404, $06, $12, $12, $20) : Mem($1408) = $FE
+  Steps(4)
+  Check(Bool(CpuA = $4D And CpuPC = $1407), "self-modifying code")
+  ; cycle budgets: BRA * is 3 cycles
+  CompilerIf #CPU_TIMING = 1
+    Fresh($1700) : Mem($1700) = $20 : Mem($1701) = $FE
+    CpuCycles = 0
+    R = CpuRun(30)
+    Check(Bool(R = 30 And CpuCycles = 30), "30-cycle window")
+    R = CpuRun(31)
+    Check(Bool(R = 33 And CpuCycles = 63), "window overshoot")
+  CompilerEndIf
+  Say("API/interrupt/bus checks failures=") : Num(ApiFail)
+  If ApiFail = 0
+    Say(" PASS")
+  Else
+    Say(" FAIL")
+  EndIf
+  Eol()
+EndProcedure
+
+Procedure.i CapHas(*text.i)
+  Protected k.i, j.i, c.i, hit.i
+  For k = 0 To CapLen - 1
+    hit = 1
+    j = 0
+    c = PeekA(*text) & 255
+    While c
+      If k + j >= CapLen
+        hit = 0
+        Break
+      EndIf
+      If Cap(k + j) <> c
+        hit = 0
+        Break
+      EndIf
+      j = j + 1
+      c = PeekA(*text + j) & 255
+    Wend
+    If hit
+      ProcedureReturn 1
+    EndIf
+  Next
+  ProcedureReturn 0
+EndProcedure
+Procedure SchwotzerTest()
+  Protected total.i, t0.i, seg.i, ln.i, k.i, ok.i
+  For I = 0 To 65535
+    Mem(I) = 0
+  Next
+  Cursor = ?Schwotzer
+  Repeat
+    seg = WordIn() : ln = WordIn()
+    If ln = 0
+      Break
+    EndIf
+    For k = 0 To ln - 1
+      Mem((seg + k) & $FFFF) = ByteIn()
+    Next
+  ForEver
+  CpuMapPages(0, 256, @Mem(0), 1)
+  CpuMapIo($FF, 1)
+  CaptureMode = 1 : CapLen = 0
+  Fresh($3000) : CpuS = $2F00 : CpuU = $2E00
+  t0 = Micros()
+  While total < 20000000
+    total = total + CpuRun(10000)
+    If CpuPC = $8000 Or CpuStopped
+      Break
+    EndIf
+    UsbSerialTask() : SafetyPet()
+  Wend
+  CaptureMode = 0
+  Say("Schwotzer output:")
+  For k = 0 To CapLen - 1
+    UsbSerialWrite(Cap(k))
+  Next
+  Eol()
+  ok = Bool(CapHas("All Tests succeded") And CapHas("Failed") = 0 And CpuPC = $8000)
+  Say("Schwotzer validation ")
+  If ok
+    Say("PASS")
+  Else
+    Say("FAIL")
+  EndIf
+  Say(" PC=") : Num(CpuPC) : Say(" stopped=") : Num(CpuStopped) : Say(" op=") : Num(CpuBadOpcode)
+  Say(" budget used=") : Num(total) : Say(" us=") : Num(Micros() - t0) : Eol()
+  CpuMapPages(0, 256, @Mem(0), 1)
+EndProcedure

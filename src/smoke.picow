@@ -1,0 +1,31 @@
+; Smoke build: compile check for the 6809 core.
+#CLOCK_KHZ = 200000
+#CPU_TIMING = 1
+#CPU_ASM_TAIL = 1
+EnableExplicit
+XIncludeFile "RP2040/Lib/clocks.pico"
+XIncludeFile "RP2040/Lib/timer.pico"
+XIncludeFile "RP2040/Lib/uart.pico"
+XIncludeFile "RP2040/Lib/usb_serial.pico"
+XIncludeFile "RP2040/Lib/safety.pico"
+XIncludeFile "cpu6809.pico"
+XIncludeFile "io.pico"
+Global Dim Mem.a(65536)
+Procedure.i CpuBusRead(addr.i)
+  ProcedureReturn $FF
+EndProcedure
+Procedure CpuBusWrite(addr.i, value.i)
+EndProcedure
+Procedure Main()
+  SafetyBoot()
+  ClockInitKhz(#CLOCK_KHZ)
+  TimerInit()
+  UsbSerialInit()
+  CpuMapPages(0, 256, @Mem(0), 1)
+  Mem($FFFE) = $10 : Mem($FFFF) = 0
+  CpuReset()
+  CpuRun(100)
+  Repeat
+    UsbSerialTask() : SafetyPet()
+  ForEver
+EndProcedure

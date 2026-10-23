@@ -1,0 +1,13 @@
+; Pico W 6809 demo: smoke test, then benchmark mixes.
+#CLOCK_KHZ = 200000
+#CPU_TIMING = 0
+#CPU_ASM_TAIL = 1
+EnableExplicit
+XIncludeFile "RP2040/Lib/clocks.pico"
+XIncludeFile "RP2040/Lib/timer.pico"
+XIncludeFile "RP2040/Lib/uart.pico"
+XIncludeFile "RP2040/Lib/usb_serial.pico"
+XIncludeFile "RP2040/Lib/safety.pico"
+XIncludeFile "cpu6809.pico"
+XIncludeFile "io.pico"
+XIncludeFile "demo_body.pico"

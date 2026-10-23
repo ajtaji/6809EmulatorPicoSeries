@@ -1,0 +1,241 @@
+; 6809 board verification: one-instruction vectors against XRoar's MC6809, then
+; the API, bus-hook and interrupt checks. The wrapper defines #CLOCK_KHZ,
+; #CPU_TIMING, #CPU_ASM_TAIL and includes the vector data file last.
+EnableExplicit
+XIncludeFile "RP2040/Lib/clocks.pico"
+XIncludeFile "RP2040/Lib/timer.pico"
+XIncludeFile "RP2040/Lib/uart.pico"
+XIncludeFile "RP2040/Lib/usb_serial.pico"
+XIncludeFile "RP2040/Lib/safety.pico"
+XIncludeFile "../src/cpu6809.pico"
+XIncludeFile "../src/io.pico"
+Global Dim Mem.a(65536)
+Global VecFirst.i, Rng.i, Cursor.i, CaseNo.i, Flags.i, Op.i, Post.i, Base.i, Sum.i
+Global Cases.i, Failed.i, Shown.i, Bad.i, I.i, N.i, Adr.i, V.i, Ran.i, WaitStart.i
+Global InCC.i, InA.i, InB.i, InDP.i, InX.i, InY.i, InU.i, InS.i, InPC.i
+Global Dim Code.i(8)
+Global Dim Ib.i(6)
+; bus-hook test state
+Global IoReads.i, IoWrites.i, IoLastAdr.i, IoLastVal.i, IoRaiseIrq.i
+
+Global Dim Cap.a(4096)
+Global CapLen.i, CaptureMode.i
+Procedure.i CpuBusRead(addr.i)
+  IoReads = IoReads + 1
+  IoLastAdr = addr
+  If CaptureMode
+    ProcedureReturn Mem(addr)
+  EndIf
+  ProcedureReturn (addr ! $5A) & 255
+EndProcedure
+Procedure CpuBusWrite(addr.i, value.i)
+  IoWrites = IoWrites + 1
+  IoLastAdr = addr
+  IoLastVal = value
+  If CaptureMode And addr = $FF00 And CapLen < 4095
+    Cap(CapLen) = value
+    CapLen = CapLen + 1
+  EndIf
+  If IoRaiseIrq
+    CpuIrqLine = 1
+  EndIf
+EndProcedure
+
+; ---- shared with tools/refgen/refgen.c ----
+Procedure.i Rnd()
+  Rng = Rng ! (Rng << 13)
+  Rng = Rng ! ((Rng >> 17) & $7FFF)
+  Rng = Rng ! (Rng << 5)
+  ProcedureReturn Rng
+EndProcedure
+Procedure.i Bg(a.i)
+  ProcedureReturn ((a * -1640531535) >> 16) & 255
+EndProcedure
+Procedure Seed(c.i)
+  Rng = c * -1640531527 + $2545F491
+  If Rng = 0
+    Rng = 1
+  EndIf
+EndProcedure
+
+Procedure.i ByteIn()
+  Protected b.i
+  b = PeekA(Cursor) & 255
+  Cursor = Cursor + 1
+  ProcedureReturn b
+EndProcedure
+Procedure.i WordIn()
+  Protected h.i
+  h = ByteIn()
+  ProcedureReturn (h << 8) | ByteIn()
+EndProcedure
+Procedure.i MemSum()
+  Protected s.i, p.i, e.i
+  p = @Mem(0)
+  e = p + 65536
+  While p < e
+    s = s + PeekL(p)
+    p = p + 4
+  Wend
+  ProcedureReturn s
+EndProcedure
+Procedure Field(*name.i, actual.i, expected.i)
+  If actual <> expected
+    Bad = Bad + 1
+    If Shown < 12
+      Say(" ") : Say(*name) : Say("=") : Num(actual) : Say("/") : Num(expected)
+    EndIf
+  EndIf
+EndProcedure
+
+Procedure VectorTests()
+  Protected exCC.i, exA.i, exB.i, exDP.i, exX.i, exY.i, exU.i, exS.i, exPC.i, exCyc.i, exWait.i
+  Cursor = ?Vectors
+  VecFirst = WordIn() << 16
+  VecFirst = VecFirst | WordIn()
+  CaseNo = VecFirst
+  Cases = 0 : Failed = 0 : Shown = 0
+  For I = 0 To 65535
+    Mem(I) = Bg(I)
+  Next
+  Base = MemSum()
+  Repeat
+    Flags = ByteIn()
+    If Flags = $80
+      Break
+    EndIf
+    Op = ByteIn()
+    Post = 0
+    If Flags & 4
+      Post = ByteIn()
+    EndIf
+    ; the input state, drawn exactly as the host drew it
+    Seed(CaseNo)
+    InCC = Rnd() & 255 : InA = Rnd() & 255 : InB = Rnd() & 255 : InDP = Rnd() & 255
+    InX = Rnd() & $FFFF : InY = Rnd() & $FFFF : InU = Rnd() & $FFFF : InS = Rnd() & $FFFF : InPC = Rnd() & $FFFF
+    For I = 0 To 5
+      Ib(I) = Rnd() & 255
+    Next
+    N = 0
+    If Flags & 3
+      Code(N) = $0F + (Flags & 3) : N = N + 1
+    EndIf
+    Code(N) = Op : N = N + 1
+    If Flags & 4
+      Code(N) = Post : N = N + 1
+    EndIf
+    I = 0
+    While N < 7
+      Code(N) = Ib(I) : I = I + 1 : N = N + 1
+    Wend
+    For I = 0 To 6
+      Mem((InPC + I) & $FFFF) = Code(I)
+    Next
+    CpuSetCC(InCC) : CpuA = InA : CpuB = InB : CpuDPage = InDP << 8
+    CpuX = InX : CpuY = InY : CpuU = InU : CpuS = InS : CpuPC = InPC
+    CpuStopped = 0 : CpuWaiting = 0 : CpuSyncing = 0 : CpuNmiArmed = 1 : CpuNmiPending = 0
+    CpuIrqLine = 0 : CpuFirqLine = 0
+    If Flags & 8
+      CpuIrqLine = 1
+    EndIf
+    If Flags & 16
+      CpuFirqLine = 1
+    EndIf
+    If Flags & 32
+      CpuNmi()
+    EndIf
+    CpuCycles = 0
+    Ran = CpuRun(1)
+    If Flags & 64
+      Ran = CpuRun(1)
+    EndIf
+    CpuIrqLine = 0 : CpuFirqLine = 0
+    exCC = ByteIn() : exA = ByteIn() : exB = ByteIn() : exDP = ByteIn()
+    exX = WordIn() : exY = WordIn() : exU = WordIn() : exS = WordIn() : exPC = WordIn()
+    exCyc = ByteIn() : exWait = ByteIn()
+    Bad = 0
+    Field("CC", CpuGetCC(), exCC)
+    Field("A", CpuA, exA)
+    Field("B", CpuB, exB)
+    Field("DP", CpuDPage >> 8, exDP)
+    Field("X", CpuX, exX)
+    Field("Y", CpuY, exY)
+    Field("U", CpuU, exU)
+    Field("S", CpuS, exS)
+    Field("PC", CpuPC, exPC)
+    CompilerIf #CPU_TIMING = 1
+      Field("cycles", CpuCycles, exCyc)
+    CompilerEndIf
+    Field("waiting", CpuWaiting, exWait)
+    Field("stopped", CpuStopped, 0)
+    N = ByteIn()
+    For I = 1 To N
+      Adr = WordIn() : V = ByteIn()
+      If Mem(Adr) <> V
+        Bad = Bad + 1
+        If Shown < 12
+          Say(" mem") : Num(Adr) : Say("=") : Num(Mem(Adr)) : Say("/") : Num(V)
+        EndIf
+      EndIf
+      Mem(Adr) = Bg(Adr)
+    Next
+    For I = 0 To 6
+      Mem((InPC + I) & $FFFF) = Bg((InPC + I) & $FFFF)
+    Next
+    If Bad
+      Failed = Failed + 1
+      If Shown < 12
+        Say(" <- FAIL case=") : Num(CaseNo) : Say(" flags=") : Num(Flags)
+        Say(" op=") : Num(Op) : Say(" post=") : Num(Post) : Eol()
+        Shown = Shown + 1
+      EndIf
+    EndIf
+    If (Cases & 63) = 0
+      If MemSum() <> Base
+        Failed = Failed + 1
+        Say("FAIL stray write near case=") : Num(CaseNo) : Eol()
+        For I = 0 To 65535
+          Mem(I) = Bg(I)
+        Next
+      EndIf
+      UsbSerialTask() : SafetyPet()
+    EndIf
+    Cases = Cases + 1
+    CaseNo = CaseNo + 1
+  ForEver
+  If MemSum() <> Base
+    Failed = Failed + 1
+    Say("FAIL stray write at the end") : Eol()
+  EndIf
+  Say("vectors first=") : Num(VecFirst) : Say(" cases=") : Num(Cases) : Say(" failures=") : Num(Failed)
+  If Failed = 0
+    Say(" PASS")
+  Else
+    Say(" FAIL")
+  EndIf
+  Eol()
+EndProcedure
+
+XIncludeFile "api_tests.pico"
+
+Procedure Main()
+  SafetyBoot() : ClockInitKhz(#CLOCK_KHZ) : TimerInit() : UsbSerialInit()
+  WaitStart = Micros()
+  While UsbSerialReady() = 0
+    UsbSerialTask() : SafetyPet()
+    If Micros() - WaitStart > 30000000
+      Break
+    EndIf
+  Wend
+  WaitUs(200000)
+  Say("6809 verification: timing=") : Num(#CPU_TIMING) : Say(" asm_tail=") : Num(#CPU_ASM_TAIL)
+  Say(" clk_sys kHz=") : Num(ClockSysKhz()) : Eol()
+  ApiTests()
+  CpuMapPages(0, 256, @Mem(0), 1)
+  VectorTests()
+  SchwotzerTest()
+  Say("verification complete") : Eol()
+  Repeat
+    UsbSerialTask() : SafetyPet()
+  ForEver
+EndProcedure
