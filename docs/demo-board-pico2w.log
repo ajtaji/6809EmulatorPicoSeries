@@ -1,0 +1,42 @@
+[demo] pmfc: reading COM6 at 9600 baud for 30 s (the port opened 2 ms after the upload, attempt 1).
+[demo] 6809 PureMetal clk_sys kHz=150000 timing=0 asm_tail=1
+[demo] sum test A=55 PASS
+[demo] register/branch instructions=1000000 us=309764 instructions/s=3228264
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] indexed-copy instructions=1000000 us=483451 instructions/s=2068461
+[demo] call/stack instructions=1000000 us=837144 instructions/s=1194537
+[demo] register/branch instructions=1000000 us=309761 instructions/s=3228295
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] indexed-copy instructions=1000000 us=483451 instructions/s=2068461
+[demo] call/stack instructions=1000000 us=837144 instructions/s=1194537
+[demo] register/branch instructions=1000000 us=309761 instructions/s=3228295
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] indexed-copy instructions=1000000 us=483452 instructions/s=2068457
+[demo] call/stack instructions=1000000 us=837144 instructions/s=1194537
+[demo] register/branch instructions=1000000 us=309760 instructions/s=3228305
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] indexed-copy instructions=1000000 us=483451 instructions/s=2068461
+[demo] call/stack instructions=1000000 us=837143 instructions/s=1194539
+[demo] register/branch instructions=1000000 us=309760 instructions/s=3228305
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] indexed-copy instructions=1000000 us=483452 instructions/s=2068457
+[demo] call/stack instructions=1000000 us=837144 instructions/s=1194537
+[demo] register/branch instructions=1000000 us=309761 instructions/s=3228295
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] indexed-copy instructions=1000000 us=483452 instructions/s=2068457
+[demo] call/stack instructions=1000000 us=837144 instructions/s=1194537
+[demo] register/branch instructions=1000000 us=309761 instructions/s=3228295
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] indexed-copy instructions=1000000 us=483452 instructions/s=2068457
+[demo] call/stack instructions=1000000 us=837144 instructions/s=1194537
+[demo] register/branch instructions=1000000 us=309761 instructions/s=3228295
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] indexed-copy instructions=1000000 us=483452 instructions/s=2068457
+[demo] call/stack instructions=1000000 us=837144 instructions/s=1194537
+[demo] register/branch instructions=1000000 us=309761 instructions/s=3228295
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] indexed-copy instructions=1000000 us=483452 instructions/s=2068457
+[demo] call/stack instructions=1000000 us=837144 instructions/s=1194537
+[demo] register/branch instructions=1000000 us=309761 instructions/s=3228295
+[demo] arithmetic instructions=1000000 us=569525 instructions/s=1755849
+[demo] pmfc: read COM6 for 30 s: 2651 bytes.

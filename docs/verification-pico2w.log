@@ -1,0 +1,63 @@
+6809 core - board verification on the Pico 2 W (COM6, RP2350 at 150 MHz), 2026-10-24. Same core as docs/verification.log.
+timed-i was rerun after an upload the boot ROM refused (forum 1381).
+
+[verify-timed-b] 6809 verification: timing=1 asm_tail=1 clk_sys kHz=150000
+[verify-timed-b] API/interrupt/bus checks failures=0 PASS
+[verify-timed-b] vectors first=0 cases=9000 failures=0 PASS
+[verify-timed-b] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=22016
+[verify-timed-b] verification complete
+[verify-timed-c] 6809 verification: timing=1 asm_tail=1 clk_sys kHz=150000
+[verify-timed-c] API/interrupt/bus checks failures=0 PASS
+[verify-timed-c] vectors first=9000 cases=9000 failures=0 PASS
+[verify-timed-c] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=22015
+[verify-timed-c] verification complete
+[verify-timed-d] 6809 verification: timing=1 asm_tail=1 clk_sys kHz=150000
+[verify-timed-d] API/interrupt/bus checks failures=0 PASS
+[verify-timed-d] vectors first=18000 cases=9000 failures=0 PASS
+[verify-timed-d] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=22004
+[verify-timed-d] verification complete
+[verify-fast-b] 6809 verification: timing=0 asm_tail=1 clk_sys kHz=150001
+[verify-fast-b] API/interrupt/bus checks failures=0 PASS
+[verify-fast-b] vectors first=0 cases=9000 failures=0 PASS
+[verify-fast-b] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=21495
+[verify-fast-b] verification complete
+[verify-fast-c] 6809 verification: timing=0 asm_tail=1 clk_sys kHz=150000
+[verify-fast-c] API/interrupt/bus checks failures=0 PASS
+[verify-fast-c] vectors first=9000 cases=9000 failures=0 PASS
+[verify-fast-c] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=21490
+[verify-fast-c] verification complete
+[verify-fast-d] 6809 verification: timing=0 asm_tail=1 clk_sys kHz=150001
+[verify-fast-d] API/interrupt/bus checks failures=0 PASS
+[verify-fast-d] vectors first=18000 cases=9000 failures=0 PASS
+[verify-fast-d] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=21487
+[verify-fast-d] verification complete
+[verify-fast-i] 6809 verification: timing=0 asm_tail=1 clk_sys kHz=150001
+[verify-fast-i] API/interrupt/bus checks failures=0 PASS
+[verify-fast-i] vectors first=0 cases=4000 failures=0 PASS
+[verify-fast-i] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=21494
+[verify-fast-i] verification complete
+[verify-pure-b] 6809 verification: timing=1 asm_tail=0 clk_sys kHz=150000
+[verify-pure-b] API/interrupt/bus checks failures=0 PASS
+[verify-pure-b] vectors first=0 cases=9000 failures=0 PASS
+[verify-pure-b] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23500
+[verify-pure-b] verification complete
+[verify-pure-c] 6809 verification: timing=1 asm_tail=0 clk_sys kHz=150000
+[verify-pure-c] API/interrupt/bus checks failures=0 PASS
+[verify-pure-c] vectors first=9000 cases=9000 failures=0 PASS
+[verify-pure-c] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23498
+[verify-pure-c] verification complete
+[verify-pure-d] 6809 verification: timing=1 asm_tail=0 clk_sys kHz=150001
+[verify-pure-d] API/interrupt/bus checks failures=0 PASS
+[verify-pure-d] vectors first=18000 cases=9000 failures=0 PASS
+[verify-pure-d] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23496
+[verify-pure-d] verification complete
+[verify-pure-i] 6809 verification: timing=1 asm_tail=0 clk_sys kHz=150000
+[verify-pure-i] API/interrupt/bus checks failures=0 PASS
+[verify-pure-i] vectors first=0 cases=4000 failures=0 PASS
+[verify-pure-i] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23515
+[verify-pure-i] verification complete
+[verify-timed-i.pico2w] 6809 verification: timing=1 asm_tail=1 clk_sys kHz=150001
+[verify-timed-i.pico2w] API/interrupt/bus checks failures=0 PASS
+[verify-timed-i.pico2w] vectors first=0 cases=4000 failures=0 PASS
+[verify-timed-i.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=21987
+[verify-timed-i.pico2w] verification complete

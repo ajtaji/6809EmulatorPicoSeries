@@ -1,7 +1,7 @@
 """Turn an asm6809 S-record file into a PureMetal DataSection of segments:
 address(2) length(2) bytes..., ended by a zero length.
 
-  py -3 tools/embed_srec.py Diagnostics/schwotzer.s19 Diagnostics/schwotzer_data.pico Schwotzer
+  py -3 tools/embed_srec.py Diagnostics/schwotzer.s19 Diagnostics/schwotzer_data.pmi Schwotzer
 """
 import sys
 from pathlib import Path

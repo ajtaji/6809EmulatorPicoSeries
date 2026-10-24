@@ -10,7 +10,7 @@ so no procedure is called per guest instruction.
 (timed, untimed, plain-PureMetal tail) passes 31,000 one-instruction cases
 against a cycle-exact reference, the API/interrupt checks, and W. Schwotzer's
 full MC6809 validation program. Details under **Verification** and **Speed**.
-Pico 2 W (RP2350) builds compile; they have not run on a board.
+**Pico 2 W (RP2350), 2026-10-24: the same twelve runs pass on COM6** (150 MHz).
 
 **Desktop:** the same core in PureBasic for Windows, with a Neon Arcade
 debugger window and the same test suites, is in [desktop/](desktop/README.md).
@@ -183,7 +183,8 @@ Three independent checks, each run by `Diagnostics/verify_body.pico` on the boar
 | Timed, plain PureMetal computed `Goto` | PASS (cycles compared) | PASS (cycles compared) | PASS | PASS |
 
 Twelve board runs, all on the same core; captured verdicts in
-`docs/verification.log`. Schwotzer's program runs 180,050 cycles in about
+`docs/verification.log`. The same twelve pass on the Pico 2 W (RP2350, COM6,
+150 MHz): `docs/verification-pico2w.log`. Schwotzer's program runs 180,050 cycles in about
 20 ms (23 ms with the plain tail).
 
 ## Speed (Pico W, RP2040 at 200 MHz)
@@ -212,6 +213,10 @@ operations written on the register; PSH/PUL through one page pointer when the
 frame is inside one page; ANDCC re-checking interrupts only when it unmasks.
 Reserving a seventh register (the page pointer in r6) made every handler longer
 — the code generator needs r6 as scratch — and was dropped, as with the 6502.
+
+Pico 2 W (RP2350 at its default 150 MHz), same mixes, untimed: 3.23 / 1.76 /
+2.07 / 1.19 M instr/s; timed: 7.90 / 4.58 / 8.69 / 7.41 MHz-equivalent.
+`firmware/6809-pico2w.uf2` is that demo as it ran on COM6.
 
 Sizes: the demo is 92 KB of flash; 79 KB of the core runs from SRAM (RP2040),
 77.6 KB on the RP2350.

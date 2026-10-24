@@ -1,6 +1,6 @@
 """Turn a refgen vector file into a PureMetal DataSection include.
 
-  py -3 tools/embed.py Diagnostics/v0.bin Diagnostics/vectors_a.pico <first_case>
+  py -3 tools/embed.py Diagnostics/v0.bin Diagnostics/vectors_a.pmi <first_case>
 """
 import sys
 from pathlib import Path

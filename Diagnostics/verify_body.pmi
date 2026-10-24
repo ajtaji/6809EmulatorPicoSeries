@@ -1,14 +1,7 @@
-; 6809 board verification: one-instruction vectors against XRoar's MC6809, then
-; the API, bus-hook and interrupt checks. The wrapper defines #CLOCK_KHZ,
-; #CPU_TIMING, #CPU_ASM_TAIL and includes the vector data file last.
-EnableExplicit
-XIncludeFile "RP2040/Lib/clocks.pico"
-XIncludeFile "RP2040/Lib/timer.pico"
-XIncludeFile "RP2040/Lib/uart.pico"
-XIncludeFile "RP2040/Lib/usb_serial.pico"
-XIncludeFile "RP2040/Lib/safety.pico"
-XIncludeFile "../src/cpu6809.pico"
-XIncludeFile "../src/io.pico"
+; 6809 board verification, chip-independent: one-instruction vectors against XRoar's
+; MC6809, the API/bus/interrupt checks, Schwotzer's program, the benchmark. The wrapper
+; (tools/make_wrappers.py writes them) defines #CLOCK_KHZ, #CPU_TIMING, #CPU_ASM_TAIL,
+; includes the board libraries and the chip's core and io first, and the data files last.
 Global Dim Mem.a(65536)
 Global VecFirst.i, Rng.i, Cursor.i, CaseNo.i, Flags.i, Op.i, Post.i, Base.i, Sum.i
 Global Cases.i, Failed.i, Shown.i, Bad.i, I.i, N.i, Adr.i, V.i, Ran.i, WaitStart.i
@@ -216,7 +209,7 @@ Procedure VectorTests()
   Eol()
 EndProcedure
 
-XIncludeFile "api_tests.pico"
+XIncludeFile "api_tests.pmi"
 XIncludeFile "bench.pmi"
 
 Procedure Main()

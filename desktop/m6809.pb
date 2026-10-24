@@ -108,7 +108,7 @@ EndProcedure
 ; THE CPU RUNS ON ITS OWN THREAD, not in the frame: the window may be paced slowly (a
 ; window without focus is throttled by the driver), and the emulator must not slow with it.
 ; Every touch of the CPU state from the window (reset, step, load, tests) holds CpuLock.
-Global CpuLock.i, WorkerQuit.i, Worker.i
+Global CpuLock.i, WorkerQuit.i, Worker.i, UiWants.i   ; UiWants: a frame is waiting for the lock
 Procedure Worker(*unused)
   Protected k.i, anyBp.i, scanAt.q, c0.q
   Repeat
@@ -146,7 +146,9 @@ Procedure Worker(*unused)
         EndIf
       EndIf
       UnlockMutex(CpuLock)
-      Delay(0)            ; let a waiting frame take the lock
+      ; a mutex is not fair: without this the worker re-takes it at once and a frame waits
+      ; hundreds of milliseconds
+      While UiWants And WorkerQuit = 0 : Delay(1) : Wend
     Else
       Delay(5)
     EndIf
@@ -460,14 +462,15 @@ Repeat
     EndSelect
   Until e = 0
   If StepReq
-    LockMutex(CpuLock)
+    UiWants = 1 : LockMutex(CpuLock) : UiWants = 0
     StepReq = 0 : Running = 0
     CpuRun(1) : Speed$ = "stepped"
     UnlockMutex(CpuLock)
   EndIf
 
   ; a 1:1 canvas: the physical client size (the engine's checklist, item 4)
-  SetGadgetAttribute(Gl, #PB_OpenGL_SetContext, #True)
+  ; NOT SetGadgetAttribute(Gl, #PB_OpenGL_SetContext) here: one context, made current once by
+  ; OpenGLWindow on this thread, and wglMakeCurrent costs 8-80 ms a call on this PC.
   cw = GadgetWidth(Gl) : ch = GadgetHeight(Gl)
   GetClientRect_(WindowID(Win), @r)
   pw = r\right - r\left : ph = r\bottom - r\top
@@ -478,7 +481,7 @@ Repeat
   GL_ViewportX = 0 : GL_ViewportY = 0 : GL_ViewportW = pw : GL_ViewportH = ph
   dt = (ElapsedMilliseconds() - lastMs) / 1000.0 : lastMs = ElapsedMilliseconds()
   ; the frame reads (and its buttons change) the CPU state: under the lock, for the ~1 ms it draws
-  LockMutex(CpuLock)
+  UiWants = 1 : LockMutex(CpuLock) : UiWants = 0
   Neon_ChromeBeginFrame(WindowMouseX(Win), WindowMouseY(Win), mouseDown, wheel, keyCode, keyChar, dt)
   glBindFramebuffer(#GL_FRAMEBUFFER, 0)
   glDisable_(#GL_SCISSOR_TEST)

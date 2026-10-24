@@ -61,14 +61,12 @@ thread, Schwotzer's program and its end loop ran at 452 MHz-equivalent.
 ![tests](../docs/desktop-tests.png)
 ![running](../docs/desktop-running.png)
 
-The CPU runs on a worker thread, not in the frame: started from a background
-process the window was paced at about 5–8 frames a second (measured; most
-likely the driver throttling a window without focus - not confirmed), and an emulator run inside the frame ran at 20 MHz instead
-of 450. The window takes the CPU lock only for the ~1 ms it draws, and for
-reset/step/load/tests.
+The CPU runs on a worker thread, not in the frame, and the window takes the CPU
+lock only for the ~1 ms it draws and for reset/step/load/tests. A flag hands the
+lock to a waiting frame: a mutex is not fair, and without the flag the worker
+re-took it at once and each frame waited ~380 ms.
 
-Started from a background process on this PC, the window took about 12 s to
-open, 7 s to build its fonts and 10 s for its first frame (measured with
-`M6809_TRACE=<file>`). The cause is not established: CPU load was 28%, the
-desktop was not locked, and drawing a frame measured under 1 ms; the time goes
-to window creation, font atlases and the GL context calls.
+The GL context is made current once (by `OpenGLWindow`), never per frame: on this
+PC `wglMakeCurrent` costs 8-80 ms a call (found by the C64 session the same day;
+see its shared note). With both fixes the window opens in 0.25 s and draws at well
+over 60 frames a second while the CPU runs at ~410 MHz-equivalent beside it.

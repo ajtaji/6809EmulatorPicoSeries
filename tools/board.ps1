@@ -16,7 +16,8 @@ $root = Split-Path $PSScriptRoot -Parent
 $build = Join-Path $PSScriptRoot 'build.ps1'
 $jobs = @()
 foreach ($p in $Programs) {
-    $name = [IO.Path]::GetFileNameWithoutExtension($p)
+    # the extension stays in the name: verify-timed-b.picow and .pico2w must not share an output
+    $name = [IO.Path]::GetFileName($p).Replace('.', '-')
     $out = "build/$name.uf2"
     & $build -Source $p -Output $out | Out-Null
     # refuse an image that reaches the NES ROM store at flash $10050000
@@ -40,7 +41,7 @@ try {
     Release-BoardLease $lease
 }
 foreach ($j in $jobs) {
-    $tag = [IO.Path]::GetFileNameWithoutExtension($j[0])
+    $tag = [IO.Path]::GetFileName($j[0])
     Get-Content (Join-Path $root ($j[1] + '.build.log')) |
         Where-Object { $_ -match '^(6809|API|vectors|Schwotzer v|verification|FAIL|sum test|register|arith|indexed|call)|<- FAIL|pmfc: (BUILD|uploaded|read)' } |
         ForEach-Object { "[$tag] $_" }

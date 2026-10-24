@@ -425,7 +425,7 @@ Procedure.i RunAllSuites()
   For k = 1 To 4
     b$ = StringField("b c d i", k, " ")
     cases = 0 : ms = 0
-    fails = RunVectorFile(TestRoot$ + "Diagnostics\vectors_" + b$ + ".pico", @cases, @ms)
+    fails = RunVectorFile(TestRoot$ + "Diagnostics\vectors_" + b$ + ".pmi", @cases, @ms)
     If fails = 0
       Report("vectors " + b$ + ": " + Str(cases) + " cases PASS (" + Str(ms) + " ms)")
     ElseIf fails > 0
