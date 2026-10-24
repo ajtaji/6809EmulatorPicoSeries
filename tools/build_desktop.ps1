@@ -20,5 +20,5 @@ foreach ($t in 1, 0) {
     if ($p.ExitCode) { throw "desktop suites FAILED (CPU_TIMING=$t): desktop\build\verify_$t.log" }
 }
 # the program exactly as built and tested here
-New-Item -ItemType Directory -Force desktopin | Out-Null
-Copy-Item desktopuild\m6809.exe desktopin\m6809.exe -Force
+New-Item -ItemType Directory -Force desktop\bin | Out-Null
+Copy-Item desktop\build\m6809.exe desktop\bin\m6809.exe -Force
