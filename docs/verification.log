@@ -1,0 +1,159 @@
+6809 core - board verification on the Pico W (COM7, RP2040 at 200 MHz), 2026-10-23. Core: commit after fe9741d (unchanged since).
+Oracle: XRoar MC6809 (refgen); batch i regenerated after the CWAI and TSTA/TSTB-adjustment oracle fixes.
+
+[timed-b] 6809 verification: timing=1 asm_tail=1 clk_sys kHz=200000
+[timed-b] API/interrupt/bus checks failures=0 PASS
+[timed-b] vectors first=0 cases=9000 failures=0 PASS
+[timed-b] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=20307
+[timed-b] verification complete
+[timed-b] register/branch cycles=1000002 us=108866 emulated kHz=9185
+[timed-b] arithmetic cycles=1000002 us=200556 emulated kHz=4986
+[timed-b] indexed-copy cycles=1000000 us=105340 emulated kHz=9493
+[timed-b] call/stack cycles=1000004 us=125001 emulated kHz=7999
+[timed-b] register/branch cycles=1000002 us=108864 emulated kHz=9185
+[timed-b] arithmetic cycles=1000002 us=200557 emulated kHz=4986
+[timed-b] indexed-copy cycles=1000000 us=105340 emulated kHz=9493
+[timed-b] call/stack cycles=1000004 us=125002 emulated kHz=7999
+[timed-c] 6809 verification: timing=1 asm_tail=1 clk_sys kHz=200000
+[timed-c] API/interrupt/bus checks failures=0 PASS
+[timed-c] vectors first=9000 cases=9000 failures=0 PASS
+[timed-c] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=20308
+[timed-c] verification complete
+[timed-c] register/branch cycles=1000002 us=108866 emulated kHz=9185
+[timed-c] arithmetic cycles=1000002 us=200557 emulated kHz=4986
+[timed-c] indexed-copy cycles=1000000 us=105340 emulated kHz=9493
+[timed-c] call/stack cycles=1000004 us=125002 emulated kHz=7999
+[timed-c] register/branch cycles=1000002 us=108863 emulated kHz=9185
+[timed-c] arithmetic cycles=1000002 us=200557 emulated kHz=4986
+[timed-c] indexed-copy cycles=1000000 us=105341 emulated kHz=9492
+[timed-c] call/stack cycles=1000004 us=125001 emulated kHz=7999
+[timed-d] 6809 verification: timing=1 asm_tail=1 clk_sys kHz=200000
+[timed-d] API/interrupt/bus checks failures=0 PASS
+[timed-d] vectors first=18000 cases=9000 failures=0 PASS
+[timed-d] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=20309
+[timed-d] verification complete
+[timed-d] register/branch cycles=1000002 us=108866 emulated kHz=9185
+[timed-d] arithmetic cycles=1000002 us=200557 emulated kHz=4986
+[timed-d] indexed-copy cycles=1000000 us=105340 emulated kHz=9493
+[timed-d] call/stack cycles=1000004 us=125002 emulated kHz=7999
+[timed-d] register/branch cycles=1000002 us=108864 emulated kHz=9185
+[timed-d] arithmetic cycles=1000002 us=200556 emulated kHz=4986
+[timed-d] indexed-copy cycles=1000000 us=105341 emulated kHz=9492
+[timed-d] call/stack cycles=1000004 us=125001 emulated kHz=7999
+[fast-b] 6809 verification: timing=0 asm_tail=1 clk_sys kHz=200000
+[fast-b] API/interrupt/bus checks failures=0 PASS
+[fast-b] vectors first=0 cases=9000 failures=0 PASS
+[fast-b] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=19998
+[fast-b] verification complete
+[fast-b] register/branch instructions=1000000 us=272264 instructions/s=3672905
+[fast-b] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[fast-b] indexed-copy instructions=1000000 us=437209 instructions/s=2287235
+[fast-b] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[fast-b] register/branch instructions=1000000 us=272263 instructions/s=3672919
+[fast-b] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[fast-b] indexed-copy instructions=1000000 us=437209 instructions/s=2287235
+[fast-b] call/stack instructions=1000000 us=774286 instructions/s=1291512
+[fast-c] 6809 verification: timing=0 asm_tail=1 clk_sys kHz=200000
+[fast-c] API/interrupt/bus checks failures=0 PASS
+[fast-c] vectors first=9000 cases=9000 failures=0 PASS
+[fast-c] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=20004
+[fast-c] verification complete
+[fast-c] register/branch instructions=1000000 us=272265 instructions/s=3672892
+[fast-c] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[fast-c] indexed-copy instructions=1000000 us=437210 instructions/s=2287230
+[fast-c] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[fast-c] register/branch instructions=1000000 us=272262 instructions/s=3672932
+[fast-c] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[fast-c] indexed-copy instructions=1000000 us=437209 instructions/s=2287235
+[fast-c] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[fast-d] 6809 verification: timing=0 asm_tail=1 clk_sys kHz=200000
+[fast-d] API/interrupt/bus checks failures=0 PASS
+[fast-d] vectors first=18000 cases=9000 failures=0 PASS
+[fast-d] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=19999
+[fast-d] verification complete
+[fast-d] register/branch instructions=1000000 us=272265 instructions/s=3672892
+[fast-d] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[fast-d] indexed-copy instructions=1000000 us=437209 instructions/s=2287235
+[fast-d] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[fast-d] register/branch instructions=1000000 us=272262 instructions/s=3672932
+[fast-d] arithmetic instructions=1000000 us=517143 instructions/s=1933701
+[fast-d] indexed-copy instructions=1000000 us=437210 instructions/s=2287230
+[fast-d] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[verify-fast-i] 6809 verification: timing=0 asm_tail=1 clk_sys kHz=200000
+[verify-fast-i] API/interrupt/bus checks failures=0 PASS
+[verify-fast-i] vectors first=0 cases=4000 failures=0 PASS
+[verify-fast-i] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=19978
+[verify-fast-i] verification complete
+[verify-fast-i] register/branch instructions=1000000 us=272265 instructions/s=3672892
+[verify-fast-i] arithmetic instructions=1000000 us=517145 instructions/s=1933693
+[verify-fast-i] indexed-copy instructions=1000000 us=437210 instructions/s=2287230
+[verify-fast-i] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[verify-fast-i] register/branch instructions=1000000 us=272262 instructions/s=3672932
+[verify-fast-i] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[verify-fast-i] indexed-copy instructions=1000000 us=437210 instructions/s=2287230
+[verify-fast-i] call/stack instructions=1000000 us=774286 instructions/s=1291512
+[verify-pure-b] 6809 verification: timing=1 asm_tail=0 clk_sys kHz=200000
+[verify-pure-b] API/interrupt/bus checks failures=0 PASS
+[verify-pure-b] vectors first=0 cases=9000 failures=0 PASS
+[verify-pure-b] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23110
+[verify-pure-b] verification complete
+[verify-pure-b] register/branch cycles=1000002 us=136855 emulated kHz=7307
+[verify-pure-b] arithmetic cycles=1000002 us=228334 emulated kHz=4379
+[verify-pure-b] indexed-copy cycles=1000000 us=121241 emulated kHz=8248
+[verify-pure-b] call/stack cycles=1000004 us=136592 emulated kHz=7321
+[verify-pure-b] register/branch cycles=1000002 us=136852 emulated kHz=7307
+[verify-pure-b] arithmetic cycles=1000002 us=228334 emulated kHz=4379
+[verify-pure-b] indexed-copy cycles=1000000 us=121241 emulated kHz=8248
+[verify-pure-b] call/stack cycles=1000004 us=136593 emulated kHz=7321
+[verify-pure-c] 6809 verification: timing=1 asm_tail=0 clk_sys kHz=200000
+[verify-pure-c] API/interrupt/bus checks failures=0 PASS
+[verify-pure-c] vectors first=9000 cases=9000 failures=0 PASS
+[verify-pure-c] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23112
+[verify-pure-c] verification complete
+[verify-pure-c] register/branch cycles=1000002 us=136855 emulated kHz=7307
+[verify-pure-c] arithmetic cycles=1000002 us=228334 emulated kHz=4379
+[verify-pure-c] indexed-copy cycles=1000000 us=121241 emulated kHz=8248
+[verify-pure-c] call/stack cycles=1000004 us=136593 emulated kHz=7321
+[verify-pure-c] register/branch cycles=1000002 us=136853 emulated kHz=7307
+[verify-pure-c] arithmetic cycles=1000002 us=228334 emulated kHz=4379
+[verify-pure-c] indexed-copy cycles=1000000 us=121241 emulated kHz=8248
+[verify-pure-c] call/stack cycles=1000004 us=136592 emulated kHz=7321
+[verify-pure-d] 6809 verification: timing=1 asm_tail=0 clk_sys kHz=200000
+[verify-pure-d] API/interrupt/bus checks failures=0 PASS
+[verify-pure-d] vectors first=18000 cases=9000 failures=0 PASS
+[verify-pure-d] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23108
+[verify-pure-d] verification complete
+[verify-pure-d] register/branch cycles=1000002 us=136855 emulated kHz=7307
+[verify-pure-d] arithmetic cycles=1000002 us=228334 emulated kHz=4379
+[verify-pure-d] indexed-copy cycles=1000000 us=121241 emulated kHz=8248
+[verify-pure-d] call/stack cycles=1000004 us=136593 emulated kHz=7321
+[verify-pure-d] register/branch cycles=1000002 us=136853 emulated kHz=7307
+[verify-pure-d] arithmetic cycles=1000002 us=228334 emulated kHz=4379
+[verify-pure-d] indexed-copy cycles=1000000 us=121242 emulated kHz=8247
+[verify-pure-d] call/stack cycles=1000004 us=136592 emulated kHz=7321
+[verify-timed-i] 6809 verification: timing=1 asm_tail=1 clk_sys kHz=200000
+[verify-timed-i] API/interrupt/bus checks failures=0 PASS
+[verify-timed-i] vectors first=0 cases=4000 failures=0 PASS
+[verify-timed-i] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=20274
+[verify-timed-i] verification complete
+[verify-timed-i] register/branch cycles=1000002 us=108866 emulated kHz=9185
+[verify-timed-i] arithmetic cycles=1000002 us=200557 emulated kHz=4986
+[verify-timed-i] indexed-copy cycles=1000000 us=105341 emulated kHz=9492
+[verify-timed-i] call/stack cycles=1000004 us=125001 emulated kHz=7999
+[verify-timed-i] register/branch cycles=1000002 us=108863 emulated kHz=9185
+[verify-timed-i] arithmetic cycles=1000002 us=200557 emulated kHz=4986
+[verify-timed-i] indexed-copy cycles=1000000 us=105341 emulated kHz=9492
+[verify-timed-i] call/stack cycles=1000004 us=125001 emulated kHz=7999
+[verify-pure-i] 6809 verification: timing=1 asm_tail=0 clk_sys kHz=200000
+[verify-pure-i] API/interrupt/bus checks failures=0 PASS
+[verify-pure-i] vectors first=0 cases=4000 failures=0 PASS
+[verify-pure-i] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23142
+[verify-pure-i] verification complete
+[verify-pure-i] register/branch cycles=1000002 us=136855 emulated kHz=7307
+[verify-pure-i] arithmetic cycles=1000002 us=228334 emulated kHz=4379
+[verify-pure-i] indexed-copy cycles=1000000 us=121241 emulated kHz=8248
+[verify-pure-i] call/stack cycles=1000004 us=136593 emulated kHz=7321
+[verify-pure-i] register/branch cycles=1000002 us=136853 emulated kHz=7307
+[verify-pure-i] arithmetic cycles=1000002 us=228334 emulated kHz=4379
+[verify-pure-i] indexed-copy cycles=1000000 us=121241 emulated kHz=8248
+[verify-pure-i] call/stack cycles=1000004 us=136592 emulated kHz=7321

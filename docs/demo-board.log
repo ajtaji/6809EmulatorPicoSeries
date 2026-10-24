@@ -1,0 +1,22 @@
+[demo] 6809 PureMetal clk_sys kHz=200000 timing=0 asm_tail=1
+[demo] sum test A=55 PASS
+[demo] register/branch instructions=1000000 us=272264 instructions/s=3672905
+[demo] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[demo] indexed-copy instructions=1000000 us=437209 instructions/s=2287235
+[demo] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[demo] register/branch instructions=1000000 us=272262 instructions/s=3672932
+[demo] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[demo] indexed-copy instructions=1000000 us=437210 instructions/s=2287230
+[demo] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[demo] register/branch instructions=1000000 us=272262 instructions/s=3672932
+[demo] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[demo] indexed-copy instructions=1000000 us=437210 instructions/s=2287230
+[demo] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[demo] register/branch instructions=1000000 us=272262 instructions/s=3672932
+[demo] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[demo] indexed-copy instructions=1000000 us=437210 instructions/s=2287230
+[demo] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[demo] register/branch instructions=1000000 us=272262 instructions/s=3672932
+[demo] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[demo] indexed-copy instructions=1000000 us=437210 instructions/s=2287230
+[demo] call/stack instructions=1000000 us=774286 instructions/s=1291512

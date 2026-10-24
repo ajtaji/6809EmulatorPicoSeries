@@ -46,7 +46,7 @@ static uint8_t bg(uint32_t a) { return (uint8_t)(((a * 0x9E3779B1u) >> 16) & 255
 static void seed(uint32_t c) { rng = c * 0x9E3779B9u + 0x2545F491u; if (!rng) rng = 1; }
 
 static uint8_t mem[65536];
-static int cycles, waiting_hit;
+static int cycles, waiting_hit, trace_on, vectored;
 static int nwr;
 static uint16_t wra[256];
 static uint8_t wrv[256];
@@ -60,6 +60,8 @@ static void mem_cycle(void *sptr, bool RnW, uint16_t A) {
 		return;
 	}
 	cycles++;
+	if (cpu->state == mc6809_state_irq_reset_vector) vectored = 1;
+	if (trace_on) fprintf(stderr, "  cyc %2d %c %04X state=%u\n", cycles, RnW ? 'R' : 'W', A, cpu->state);
 	if (RnW) {
 		cpu->D = mem[A];
 	} else {
@@ -151,7 +153,8 @@ int main(int argc, char **argv) {
 		cpu->firq = cpu->firq_latch = cpu->firq_active = (lines & 2) != 0;
 		cpu->nmi = cpu->nmi_latch = cpu->nmi_active = (lines & 4) != 0;
 		cpu->state = mc6809_state_label_a;
-		cycles = 0; nwr = 0; posthooks = 0; waiting_hit = 0;
+		cycles = 0; nwr = 0; posthooks = 0; waiting_hit = 0; vectored = 0;
+		trace_on = getenv("REFGEN_TRACE") && (unsigned)atoi(getenv("REFGEN_TRACE")) == c;
 		cpu->running = 1;
 		cpu->run(cpu);
 		if (op == cwai) {
@@ -165,7 +168,7 @@ int main(int argc, char **argv) {
 		}
 		/* TSTA/TSTB: XRoar spends 3 cycles; the datasheet, MAME and the
 		 * bus-capture decoder (hoglet67/6809Decoder) all say 2. */
-		if (op == 0x4d || op == 0x5d) cycles -= 1;
+		if ((op == 0x4d || op == 0x5d) && !vectored) cycles -= 1;   /* only if TST itself ran */
 		if (cycles > 255) { fprintf(stderr, "case %u: %d cycles\n", c, cycles); return 2; }
 		/* -- the record -- */
 		fputc(flags, f); fputc(op & 255, f);

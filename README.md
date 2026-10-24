@@ -6,7 +6,11 @@ through 256-entry `.Label` tables (page 1, page 2 = `$10`, page 3 = `$11`, and
 one for indexed postbytes); every handler ends in its own inlined computed jump,
 so no procedure is called per guest instruction.
 
-Status and measured results: see **Verification** and **Speed** below.
+**Status (2026-10-23): verified on a physical Pico W.** Every configuration
+(timed, untimed, plain-PureMetal tail) passes 31,000 one-instruction cases
+against a cycle-exact reference, the API/interrupt checks, and W. Schwotzer's
+full MC6809 validation program. Details under **Verification** and **Speed**.
+Pico 2 W (RP2350) builds compile; they have not run on a board.
 
 ## Using the core (the machine-facing API)
 
@@ -42,8 +46,10 @@ register write is `CpuMapPages(block * 32, 32, @Phys(physBlock * 8192), 1)`.
 ROM, the `$FE` constant page and the `$FF` I/O page are separate 256-byte
 pages, so they can be mapped differently from the block around them (map
 `$FF` with `CpuMapIo($FF, 1)`; vectors `$FFF0-$FFFF` then come through
-`CpuBusRead`, which is where the GIME supplies them from ROM). Writing the
-tables directly is allowed; `CpuMapPages` is only a convenience.
+`CpuBusRead`, which is where the GIME supplies them from ROM). **Fill the
+tables only through `CpuMapPages` / `CpuMapIo`**: `CpuRdMap` has 512 entries,
+pages 256-511 mirroring 0-255 (shifted by -65536) so the program counter may
+run a few bytes past `$FFFF` before the dispatch wraps it.
 
 A 16-bit access within one page is done with two byte loads from the same
 pointer; an access that straddles a page boundary is done byte by byte, so a
@@ -111,8 +117,8 @@ modelled: a write is visible at the end of its instruction.
 ### Constraints
 
 - One CPU instance, not reentrant; keep it on one host core.
-- Registers reserved application-wide (RP2040): **r8 = CpuPC, r9 = CpuA,
-  r10 = CpuRes, r11 = CpuLeft, r4 = CpuB, r5 = CpuFZ**. PureMetal refuses any
+- Registers reserved application-wide (both chips): **r8 = CpuPC, r9 = CpuA,
+  r10 = CpuFN, r11 = CpuLeft, r4 = CpuB, r5 = CpuFZ**. PureMetal refuses any
   library or assembly that conflicts with them.
 - Undocumented opcodes stop the core (loudly); undocumented **indexed
   postbytes and EXG/TFR register codes** behave as the silicon does (taken from
@@ -124,6 +130,8 @@ PureMetal Forge (`--compile`), no SDK:
 
 ```powershell
 .\tools\build.ps1 -Source src/demo.picow -Output firmware/6809-picow.uf2
+# on the shared bench: one lease (C:\PMFBuild\board-leases\lease.ps1) for a whole batch
+powershell -ExecutionPolicy Bypass -File tools\board.ps1 -Programs Diagnostics/verify-timed-b.picow,src/demo.picow -Seconds 30
 ```
 
 The core is generated: edit `tools/generate.py`, then `py -3 tools/generate.py`.
@@ -150,7 +158,11 @@ Three independent checks, each run by `Diagnostics/verify_body.pico` on the boar
      taking an interrupt at once.
    - One deliberate deviation from the oracle: XRoar charges TSTA/TSTB 3
      cycles; the datasheet, MAME and hoglet67's bus-capture decoder all say 2,
-     and the core uses 2 (refgen adjusts those two opcodes).
+     and the core uses 2 (refgen adjusts those two opcodes, only when the
+     TST itself ran rather than an interrupt).
+   - XRoar ends a CWAI "step" right after the stacking; refgen runs on to the
+     wait, or to the interrupt CWAI takes at once plus the handler's first
+     instruction (the board runs that as a second window).
 2. **API, bus-hook and interrupt checks** (`Diagnostics/api_tests.pico`):
    zero/negative budgets, undocumented opcodes stopping on pages 1 and 2,
    reset, NMI ignored until S is loaded, I/O-page reads and writes, a word
@@ -161,9 +173,45 @@ Three independent checks, each run by `Diagnostics/verify_body.pico` on the boar
    SGS-Thomson EF6809P; from hoglet67/6809Decoder), assembled with asm6809
    and run as a whole program: it prints "All Tests succeded".
 
-Configurations: timed + assembly tail (all four batches), untimed + assembly
-tail (b, i), timed + plain PureMetal computed Goto (b, i). Results are in
-`docs/verification.log`.
+| Configuration | Batches b, c, d (27,000) | Batch i (4,000 interrupt) | API checks | Schwotzer |
+|---|---|---|---|---|
+| Timed, assembly tail | PASS (cycles compared) | PASS (cycles compared) | PASS | PASS |
+| Untimed, assembly tail | PASS | PASS | PASS | PASS |
+| Timed, plain PureMetal computed `Goto` | PASS (cycles compared) | PASS (cycles compared) | PASS | PASS |
+
+Twelve board runs, all on the same core; captured verdicts in
+`docs/verification.log`. Schwotzer's program runs 180,050 cycles in about
+20 ms (23 ms with the plain tail).
+
+## Speed (Pico W, RP2040 at 200 MHz)
+
+Each sample executes exactly 1,000,000 guest instructions (untimed build) or a
+1,000,000-cycle budget (timed build); USB and setup are outside the interval.
+Memory goes through the page tables in every measurement.
+
+| Mix | Initial | Tuned (untimed) | Tuned, timed build |
+|---|---:|---:|---:|
+| `DECB / BNE` loop | 3.20 M instr/s | **3.67 M instr/s** | 9.19 MHz-equivalent |
+| `ADDA # / EORA # / ASLA / LSRA / ADDD # / ANDCC # / BRA` | 1.65 M | **1.93 M** | 4.99 MHz |
+| `LDA ,X+ / STA ,Y+ / DECB / BNE` copy | 2.05 M | **2.29 M** | 9.49 MHz |
+| `BSR / PSHS D,X / LDD 2,S / LEAX 1,X / PULS D,X / RTS / BRA` | 1.20 M | **1.29 M** | 8.00 MHz |
+
+"MHz-equivalent" is the E clock the timed build sustains: a CoCo 3 runs at
+0.89 or 1.79 MHz, so the core has 2.8x-10x headroom at full speed. The timed
+build is faster in E-cycle terms because 6809 instructions average several
+cycles each.
+
+What made it faster (measured; see `tools/hotpath.py` for the static counts):
+operand temporaries as `CpuRun` locals and N held in r10 instead of a scratch
+value; PC left unwrapped after operand bytes (the read table is mirrored past
+`$FFFF`; the dispatch tail wraps); `PeekB` for branch offsets; inherent A/B
+operations written on the register; PSH/PUL through one page pointer when the
+frame is inside one page; ANDCC re-checking interrupts only when it unmasks.
+Reserving a seventh register (the page pointer in r6) made every handler longer
+— the code generator needs r6 as scratch — and was dropped, as with the 6502.
+
+Sizes: the demo is 92 KB of flash; 79 KB of the core runs from SRAM (RP2040),
+77.6 KB on the RP2350.
 
 ## Credits
 
