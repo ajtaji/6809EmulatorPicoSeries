@@ -157,3 +157,10 @@ Oracle: XRoar MC6809 (refgen); batch i regenerated after the CWAI and TSTA/TSTB-
 [verify-pure-i] arithmetic cycles=1000002 us=228334 emulated kHz=4379
 [verify-pure-i] indexed-copy cycles=1000000 us=121241 emulated kHz=8248
 [verify-pure-i] call/stack cycles=1000004 us=136592 emulated kHz=7321
+
+2026-10-24, after the verifier became chip-independent (.pmi + generated wrappers): RP2040 confirmation on COM7
+[verify-timed-b.picow] 6809 verification: timing=1 asm_tail=1 clk_sys kHz=200000
+[verify-timed-b.picow] API/interrupt/bus checks failures=0 PASS
+[verify-timed-b.picow] vectors first=0 cases=9000 failures=0 PASS
+[verify-timed-b.picow] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=20308
+[verify-timed-b.picow] verification complete
