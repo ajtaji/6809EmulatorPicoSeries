@@ -12,6 +12,9 @@ against a cycle-exact reference, the API/interrupt checks, and W. Schwotzer's
 full MC6809 validation program. Details under **Verification** and **Speed**.
 Pico 2 W (RP2350) builds compile; they have not run on a board.
 
+**Desktop:** the same core in PureBasic for Windows, with a Neon Arcade
+debugger window and the same test suites, is in [desktop/](desktop/README.md).
+
 ## Using the core (the machine-facing API)
 
 ```text

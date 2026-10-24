@@ -5,3 +5,4 @@ tools/refgen/*.exe
 tools/refgen/*.obj
 Diagnostics/*.bin
 Diagnostics/*.lst
+!Diagnostics/schwotzer.lst
