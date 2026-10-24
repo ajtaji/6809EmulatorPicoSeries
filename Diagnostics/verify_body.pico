@@ -217,6 +217,7 @@ Procedure VectorTests()
 EndProcedure
 
 XIncludeFile "api_tests.pico"
+XIncludeFile "bench.pmi"
 
 Procedure Main()
   SafetyBoot() : ClockInitKhz(#CLOCK_KHZ) : TimerInit() : UsbSerialInit()
@@ -235,6 +236,7 @@ Procedure Main()
   VectorTests()
   SchwotzerTest()
   Say("verification complete") : Eol()
+  Benchmark()
   Repeat
     UsbSerialTask() : SafetyPet()
   ForEver

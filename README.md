@@ -128,9 +128,42 @@ PureMetal Forge (`--compile`), no SDK:
 
 The core is generated: edit `tools/generate.py`, then `py -3 tools/generate.py`.
 
-## Verification
+## Verification (all on the physical Pico W, COM7, 200 MHz)
 
-(see below; filled in as each stage is proven on the board)
+Three independent checks, each run by `Diagnostics/verify_body.pico` on the board:
+
+1. **One-instruction vectors against a cycle-exact reference.** No published
+   per-instruction suite exists for the 6809 (SingleStepTests has none), so
+   `tools/refgen` builds XRoar's MC6809 core (hardware-derived, used for
+   cycle-exact Dragon/CoCo emulation) on the host and records the end state of
+   each case: all registers, CC, the cycle count, the CWAI wait state and every
+   byte written. A case's *input* is not stored: the board regenerates it from
+   the case number (xorshift32 registers, a hashed background for all 64 KB,
+   the opcode, a documented postbyte, random operand bytes), so ~20 bytes per
+   case suffice. After each case the board restores the background and checks
+   a whole-memory sum every 64 cases, so a stray write anywhere fails loudly.
+   - Batches b, c, d: 27,000 cases, every documented opcode of pages 1-3 about
+     100 times each, all 217 documented indexed postbytes, all EXG/TFR codes
+     and PSH/PUL masks.
+   - Batch i: 4,000 interrupt cases - IRQ, FIRQ and NMI asserted (masked and
+     not) on ordinary instructions, SYNC with each line, CWAI both waiting and
+     taking an interrupt at once.
+   - One deliberate deviation from the oracle: XRoar charges TSTA/TSTB 3
+     cycles; the datasheet, MAME and hoglet67's bus-capture decoder all say 2,
+     and the core uses 2 (refgen adjusts those two opcodes).
+2. **API, bus-hook and interrupt checks** (`Diagnostics/api_tests.pico`):
+   zero/negative budgets, undocumented opcodes stopping on pages 1 and 2,
+   reset, NMI ignored until S is loaded, I/O-page reads and writes, a word
+   straddling an I/O page and RAM, a ROM page discarding writes, an IRQ raised
+   inside a bus write taken at the very next instruction, FIRQ stacking,
+   CWAI and SYNC waits, self-modifying code, cycle-window lengths.
+3. **W. Schwotzer's "MC6809 CPU Emulation Validation"** (validated on an
+   SGS-Thomson EF6809P; from hoglet67/6809Decoder), assembled with asm6809
+   and run as a whole program: it prints "All Tests succeded".
+
+Configurations: timed + assembly tail (all four batches), untimed + assembly
+tail (b, i), timed + plain PureMetal computed Goto (b, i). Results are in
+`docs/verification.log`.
 
 ## Credits
 

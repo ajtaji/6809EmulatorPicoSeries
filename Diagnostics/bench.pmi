@@ -1,0 +1,80 @@
+; The demo benchmark (src/demo_body.pmi), run by the verifier after its checks.
+Global TestRan.i, TestStart.i, TestElapsed.i
+Procedure.i Rate(count.i, us.i)
+  ; count * 1e6 / us without overflowing 32 bits
+  Protected q.i, remainder.i, digit.i
+  q = count / us : remainder = count % us
+  For digit = 1 To 6
+    remainder = remainder * 10
+    q = q * 10 + remainder / us
+    remainder = remainder % us
+  Next
+  ProcedureReturn q
+EndProcedure
+Procedure Load(adr.i, *bytes.i, n.i)
+  Protected k.i
+  For k = 0 To n - 1
+    Mem(adr + k) = PeekA(*bytes + k) & 255
+  Next
+EndProcedure
+Procedure Sample(*name.i, pc.i)
+  Protected unit.i
+  CpuSetCC($50) : CpuA = 0 : CpuB = 0 : CpuDPage = 0
+  CpuX = $4000 : CpuY = $5000 : CpuU = $6000 : CpuS = $7000 : CpuPC = pc
+  CpuStopped = 0 : CpuWaiting = 0 : CpuSyncing = 0 : CpuCycles = 0
+  TestStart = Micros()
+  TestRan = CpuRun(1000000)
+  TestElapsed = Micros() - TestStart
+  Say(*name)
+  CompilerIf #CPU_TIMING = 1
+    Say(" cycles=") : Num(TestRan) : Say(" us=") : Num(TestElapsed)
+    Say(" emulated kHz=") : Num(Rate(TestRan, TestElapsed) / 1000)
+  CompilerElse
+    Say(" instructions=") : Num(TestRan) : Say(" us=") : Num(TestElapsed)
+    Say(" instructions/s=") : Num(Rate(TestRan, TestElapsed))
+  CompilerEndIf
+  If CpuStopped
+    Say(" STOPPED op=") : Num(CpuBadOpcode)
+  EndIf
+  Eol()
+EndProcedure
+
+Procedure Benchmark()
+  For I = 0 To 65535
+    Mem(I) = 0
+  Next
+  CpuMapPages(0, 256, @Mem(0), 1)
+  For I = 0 To 255
+    Mem($4000 + I) = I ! $A5
+  Next
+  Load($1000, ?RegBranch, 5)
+  Load($1100, ?Arith, 13)
+  Load($1200, ?IdxCopy, 17)
+  Load($1300, ?Calls, 13)
+  For N = 1 To 2
+    Sample("register/branch", $1000)
+    Sample("arithmetic", $1100)
+    Sample("indexed-copy", $1200)
+    Sample("call/stack", $1300)
+  Next
+  For I = 0 To 255
+    If Mem($5000 + I) <> (I ! $A5)
+      Say("benchmark copy check FAIL") : Eol()
+      Break
+    EndIf
+  Next
+EndProcedure
+
+DataSection
+SumProg:   ; LDB #10 / CLRA / PSHS B / ADDA ,S+ / DECB / BNE -7 / SWI3
+  Data.a $C6,$0A,$4F,$34,$04,$AB,$E0,$5A,$26,$F9,$11,$3F
+RegBranch: ; DECB / BNE -3 / BRA -5
+  Data.a $5A,$26,$FD,$20,$FB
+Arith:     ; ADDA #1 / EORA #$55 / ASLA / LSRA / ADDD #$1234 / ANDCC #$FE / BRA -13
+  Data.a $8B,$01,$88,$55,$48,$44,$C3,$12,$34,$1C,$FE,$20,$F3
+IdxCopy:   ; LDX #$4000 / LDY #$5000 / CLRB / loop: LDA ,X+ / STA ,Y+ / DECB / BNE loop / BRA start
+  Data.a $8E,$40,$00,$10,$8E,$50,$00,$5F,$A6,$80,$A7,$A0
+  Data.a $5A,$26,$F9,$20,$EF
+Calls:     ; loop: BSR sub / BRA loop / sub: PSHS D,X / LDD 2,S / LEAX 1,X / PULS D,X / RTS
+  Data.a $8D,$02,$20,$FC,$34,$16,$EC,$62,$30,$01,$35,$16,$39
+EndDataSection

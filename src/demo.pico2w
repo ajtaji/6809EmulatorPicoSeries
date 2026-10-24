@@ -1,0 +1,13 @@
+; Pico 2 W 6809 demo: smoke test, then benchmark mixes.
+#CLOCK_KHZ = 150000
+#CPU_TIMING = 0
+#CPU_ASM_TAIL = 1
+EnableExplicit
+XIncludeFile "RP2350/Lib/clocks.pico2"
+XIncludeFile "RP2350/Lib/timer.pico2"
+XIncludeFile "RP2350/Lib/uart.pico2"
+XIncludeFile "RP2350/Lib/usb_serial.pico2"
+XIncludeFile "RP2350/Lib/safety.pico2"
+XIncludeFile "cpu6809.pico2"
+XIncludeFile "io.pico2"
+XIncludeFile "demo_body.pmi"

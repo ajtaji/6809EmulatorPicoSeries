@@ -154,7 +154,15 @@ int main(int argc, char **argv) {
 		cycles = 0; nwr = 0; posthooks = 0; waiting_hit = 0;
 		cpu->running = 1;
 		cpu->run(cpu);
-		if (op == cwai && !waiting_hit) flags |= 64;   /* the wait ended at once */
+		if (op == cwai) {
+			/* XRoar ends CWAI's step right after the stacking; go on to the
+			 * wait itself, or to the interrupt it takes at once plus the
+			 * handler's first instruction (the board runs that as a second
+			 * window). */
+			cpu->running = 1;
+			cpu->run(cpu);
+			if (!waiting_hit) flags |= 64;
+		}
 		/* TSTA/TSTB: XRoar spends 3 cycles; the datasheet, MAME and the
 		 * bus-capture decoder (hoglet67/6809Decoder) all say 2. */
 		if (op == 0x4d || op == 0x5d) cycles -= 1;

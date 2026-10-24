@@ -15,6 +15,7 @@ import argparse
 root = Path(__file__).resolve().parents[1]
 ap = argparse.ArgumentParser()
 ap.add_argument('--regs', default='', help='override the register reservation (RP2040 build)')
+ap.add_argument('--locals', default='CpuRes,CpuPg,CpuVal,CpuEa,CpuTmp', help='CpuRun temporaries made Protected locals (comma list)')
 args = ap.parse_args()
 
 # ---------------------------------------------------------------- helpers
@@ -26,12 +27,14 @@ def emit(*lines):
         OUT.extend(l.split('\n'))
 
 
+# PC is not wrapped after operand bytes: it may run up to $10003 before the next
+# dispatch wraps it, and CpuRdMap's mirror (pages 256-511) reads those bytes.
 def fetch8(dst):
-    return [f'RdB({dst}, CpuPC)', 'CpuPC = (CpuPC + 1) & $FFFF']
+    return [f'RdB({dst}, CpuPC)', 'CpuPC = CpuPC + 1']
 
 
 def fetch16(dst):
-    return [f'RdW({dst}, CpuPC)', 'CpuPC = (CpuPC + 2) & $FFFF']
+    return [f'RdW({dst}, CpuPC)', 'CpuPC = CpuPC + 2']
 
 
 def charge(n):
@@ -39,6 +42,10 @@ def charge(n):
     if n == 0:
         return []
     return ['CompilerIf #CPU_TIMING = 1', f'  CpuLeft = CpuLeft - {n}', 'CompilerEndIf']
+
+
+def charge_var(v):
+    return ['CompilerIf #CPU_TIMING = 1', f'  CpuLeft = CpuLeft - {v}', 'CompilerEndIf']
 
 
 def next_op(c):
@@ -116,12 +123,23 @@ for lo, (mn, ops) in RMW.items():
         add(1, base | lo, mn, mode, body, cyc)
     # register forms
     for base, reg in ((0x40, 'CpuA'), (0x50, 'CpuB')):
+        r = reg
         if mn == 'CLR':
-            body = [f'{reg} = 0', 'CpuFN = 0', 'CpuFZ = 0', 'CpuFV = 0', 'CpuFC = 0']
+            body = [f'{r} = 0', 'CpuFN = 0', 'CpuFZ = 0', 'CpuFV = 0', 'CpuFC = 0']
         elif mn == 'TST':
-            body = ['CpuFV = 0'] + nz8(reg)
+            body = ['CpuFV = 0'] + nz8(r)
+        elif mn == 'DEC':     # V only for $80 -> $7F
+            body = [f'CpuFV = {r} & ({r} ! ({r} - 1))', f'{r} = ({r} - 1) & 255'] + nz8(r)
+        elif mn == 'INC':     # V only for $7F -> $80
+            body = [f'CpuFV = ({r} + 1) & ~{r}', f'{r} = ({r} + 1) & 255'] + nz8(r)
+        elif mn == 'COM':
+            body = [f'{r} = {r} ! 255', 'CpuFV = 0', 'CpuFC = $100'] + nz8(r)
+        elif mn == 'LSR':
+            body = [f'CpuFC = {r} << 8', f'{r} = {r} >> 1'] + nz8(r)
+        elif mn == 'ASL':
+            body = [f'CpuFC = {r} << 1', 'CpuFV = CpuFC ! (CpuFC >> 1)', f'{r} = CpuFC & 255'] + nz8(r)
         else:
-            body = [f'CpuVal = {reg}'] + ops + [f'{reg} = CpuRes']
+            body = [f'CpuVal = {r}'] + ops + [f'{r} = CpuRes']
         add(1, base | lo, mn + ('A' if reg == 'CpuA' else 'B'), 'inh', body, 2)
 
 # JMP
@@ -238,7 +256,7 @@ for mode, mo in MODES4:
 # JSR / BSR
 for mode, op, cyc in (('dir', 0x9D, 7), ('idx', 0xAD, 7), ('ext', 0xBD, 8)):
     add(1, op, 'JSR', mode, ['Push16S(CpuPC)', 'CpuPC = CpuEa'], cyc)
-add(1, 0x8D, 'BSR', 'rel8', fetch8('CpuVal') + ['Push16S(CpuPC)', 'CpuPC = (CpuPC + ((CpuVal ! 128) - 128)) & $FFFF'], 7)
+add(1, 0x8D, 'BSR', 'rel8', ['RdSB(CpuVal, CpuPC)', 'CpuPC = CpuPC + 1', 'Push16S(CpuPC)', 'CpuPC = (CpuPC + CpuVal) & $FFFF'], 7)
 add(1, 0x16, 'LBRA', 'rel16', fetch16('CpuVal') + ['CpuPC = (CpuPC + CpuVal) & $FFFF'], 5)
 add(1, 0x17, 'LBSR', 'rel16', fetch16('CpuVal') + ['Push16S(CpuPC)', 'CpuPC = (CpuPC + CpuVal) & $FFFF'], 9)
 
@@ -256,8 +274,8 @@ COND = {
     0xF: ('BLE', '((CpuFN ! CpuFV) & $80) <> 0 Or CpuFZ = 0'),
 }
 for lo, (mn, cond) in COND.items():
-    take8 = ['RdB(CpuVal, CpuPC)', 'CpuPC = (CpuPC + 1 + ((CpuVal ! 128) - 128)) & $FFFF']
-    skip8 = ['CpuPC = (CpuPC + 1) & $FFFF']
+    take8 = ['RdSB(CpuVal, CpuPC)', 'CpuPC = (CpuPC + 1 + CpuVal) & $FFFF']
+    skip8 = ['CpuPC = CpuPC + 1']
     if cond is None:
         body = take8
     elif cond == '0':
@@ -269,7 +287,7 @@ for lo, (mn, cond) in COND.items():
     if lo == 0:
         continue
     take16 = fetch16('CpuVal') + ['CpuPC = (CpuPC + CpuVal) & $FFFF'] + charge(1)
-    skip16 = ['CpuPC = (CpuPC + 2) & $FFFF']
+    skip16 = ['CpuPC = CpuPC + 2']
     if cond == '0':
         body = skip16
     else:
@@ -290,10 +308,28 @@ def psh(stack, other):
     p8 = 'Push8' + stack
     p16 = 'Push16' + stack
     s = fetch8('CpuPost')
+    # fast path: the whole frame inside one writable page -> stores through one pointer
+    s += ['CpuTmp = CpuPshCount(CpuPost)', f'CpuEa = {sp} - CpuTmp',
+          f'If CpuEa >= 0 And (CpuEa >> 8) = (({sp} - 1) >> 8)',
+          '  CpuPg = CpuWrMap(CpuEa >> 8)', 'Else', '  CpuPg = 0', 'EndIf',
+          'If CpuPg And CpuTmp',
+          f'  CpuPg = CpuPg + {sp}']
+    k = 0
+    for bit, what, n in ((0x80, 'CpuPC', 2), (0x40, 'Cpu' + other, 2), (0x20, 'CpuY', 2), (0x10, 'CpuX', 2),
+                         (0x08, 'CpuDPage >> 8', 1), (0x04, 'CpuB', 1), (0x02, 'CpuA', 1), (0x01, 'CpuGetCC()', 1)):
+        s += [f'  If CpuPost & ${bit:02X}']
+        if n == 2:
+            s += ['    CpuPg = CpuPg - 2', f'    PokeA(CpuPg, {what} >> 8)', f'    PokeA(CpuPg + 1, {what})']
+        else:
+            s += ['    CpuPg = CpuPg - 1', f'    PokeA(CpuPg, {what})']
+        s += ['  EndIf']
+    s += [f'  {sp} = CpuEa'] + ['  ' + x for x in charge_var('CpuTmp')] + ['Else']
+    slow = []
     for bit, what, n in ((0x80, 'CpuPC', 2), (0x40, 'Cpu' + other, 2), (0x20, 'CpuY', 2), (0x10, 'CpuX', 2),
                          (0x08, 'CpuDPage >> 8', 1), (0x04, 'CpuB', 1), (0x02, 'CpuA', 1), (0x01, 'CpuGetCC()', 1)):
         fn = p16 if n == 2 else p8
-        s += [f'If CpuPost & ${bit:02X}', f'  {fn}({what})'] + ['  ' + x for x in charge(n)] + ['EndIf']
+        slow += [f'If CpuPost & ${bit:02X}', f'  {fn}({what})'] + ['  ' + x for x in charge(n)] + ['EndIf']
+    s += ['  ' + x for x in slow] + ['EndIf']
     if stack == 'S':
         s += ['CpuNmiArmed = 1']
     return s
@@ -302,21 +338,44 @@ def psh(stack, other):
 def pul(stack, other):
     s = fetch8('CpuPost')
     sp = stack
+    rs = 'Cpu' + stack
+    # fast path: the whole frame inside one readable page -> loads through one pointer
+    s += ['CpuTmp = CpuPshCount(CpuPost)', f'CpuEa = {rs} + CpuTmp',
+          f'If CpuEa <= $10000 And ({rs} >> 8) = ((CpuEa - 1) >> 8)',
+          f'  CpuPg = CpuRdMap({rs} >> 8)', 'Else', '  CpuPg = 0', 'EndIf',
+          'If CpuPg And CpuTmp', f'  CpuPg = CpuPg + {rs}']
+    for bit, what, n in ((0x01, 'cc', 1), (0x02, 'CpuA', 1), (0x04, 'CpuB', 1), (0x08, 'dp', 1),
+                         (0x10, 'CpuX', 2), (0x20, 'CpuY', 2), (0x40, 'Cpu' + other, 2), (0x80, 'CpuPC', 2)):
+        s += [f'  If CpuPost & ${bit:02X}']
+        if what == 'cc':
+            s += ['    CpuSetCC(PeekA(CpuPg))', '    CutWindow()']
+        elif what == 'dp':
+            s += ['    CpuDPage = PeekA(CpuPg) << 8']
+        elif n == 1:
+            s += [f'    {what} = PeekA(CpuPg)']
+        else:
+            s += [f'    {what} = (PeekA(CpuPg) << 8) | PeekA(CpuPg + 1)']
+            if what == 'CpuS':
+                s += ['    CpuNmiArmed = 1']
+        s += [f'    CpuPg = CpuPg + {n}', '  EndIf']
+    s += [f'  {rs} = CpuEa & $FFFF'] + ['  ' + x for x in charge_var('CpuTmp')] + ['Else']
+    body = []
     items = ((0x01, 'cc', 1), (0x02, 'CpuA', 1), (0x04, 'CpuB', 1), (0x08, 'dp', 1),
              (0x10, 'CpuX', 2), (0x20, 'CpuY', 2), (0x40, 'Cpu' + other, 2), (0x80, 'CpuPC', 2))
     for bit, what, n in items:
-        s += [f'If CpuPost & ${bit:02X}']
+        body += [f'If CpuPost & ${bit:02X}']
         if what == 'cc':
-            s += [f'  Pull8{sp}(CpuVal)', '  CpuSetCC(CpuVal)', '  CutWindow()']
+            body += [f'  Pull8{sp}(CpuVal)', '  CpuSetCC(CpuVal)', '  CutWindow()']
         elif what == 'dp':
-            s += [f'  Pull8{sp}(CpuVal)', '  CpuDPage = CpuVal << 8']
+            body += [f'  Pull8{sp}(CpuVal)', '  CpuDPage = CpuVal << 8']
         elif n == 1:
-            s += [f'  Pull8{sp}({what})']
+            body += [f'  Pull8{sp}({what})']
         else:
-            s += [f'  Pull16{sp}({what})']
+            body += [f'  Pull16{sp}({what})']
             if what == 'CpuS':
-                s += ['  CpuNmiArmed = 1']
-        s += ['  ' + x for x in charge(n)] + ['EndIf']
+                body += ['  CpuNmiArmed = 1']
+        body += ['  ' + x for x in charge(n)] + ['EndIf']
+    s += ['  ' + x for x in body] + ['EndIf']
     if stack == 'S':
         s += ['CpuNmiArmed = 1']
     return s
@@ -341,7 +400,10 @@ add(1, 0x19, 'DAA', 'inh', [
     'CpuFV = CpuA ! ((CpuFC >> 1) & $80)',   # V = N xor C (the silicon's DAA)
 ], 2)
 add(1, 0x1A, 'ORCC', 'imm', fetch8('CpuVal') + ['CpuSetCC(CpuGetCC() | CpuVal)'], 3)
-add(1, 0x1C, 'ANDCC', 'imm', fetch8('CpuVal') + ['CpuSetCC(CpuGetCC() & CpuVal)', 'CutWindow()'], 3)
+# the interrupt re-check is needed only when the AND unmasks I or F
+add(1, 0x1C, 'ANDCC', 'imm', fetch8('CpuVal') + [
+    'If (CpuFI And (CpuVal & $10) = 0) Or (CpuFF And (CpuVal & $40) = 0)', '  CutWindow()', 'EndIf',
+    'CpuSetCC(CpuGetCC() & CpuVal)'], 3)
 add(1, 0x1D, 'SEX', 'inh', ['CpuA = 0', 'If CpuB & $80', '  CpuA = 255', 'EndIf',
                             'CpuFN = CpuA', 'CpuFZ = CpuB'], 2)
 add(1, 0x1E, 'EXG', 'imm', fetch8('CpuPost') + ['CpuTransfer(CpuPost, 1)'], 8)
@@ -372,7 +434,7 @@ add_raw(1, 0x13, 'SYNC', 'inh', [
 
 # prefixes: the next byte selects the page-2/3 table (no budget, no tail check)
 for page, op in ((2, 0x10), (3, 0x11)):
-    add_raw(1, op, f'PAGE{page}', 'prefix', ['RdB(CpuTmp, CpuPC)', 'CpuPC = (CpuPC + 1) & $FFFF',
+    add_raw(1, op, f'PAGE{page}', 'prefix', ['RdB(CpuTmp, CpuPC)', 'CpuPC = CpuPC + 1',
                                             f'Goto Dispatch{page}(CpuTmp)'])
 
 # --------------------------------------------------------- indexed postbytes
@@ -411,7 +473,7 @@ for pb in range(256):
     elif m == 0x9:
         b, x = fetch16('CpuEa') + [f'CpuEa = ({r} + CpuEa) & $FFFF'], 4
     elif m == 0xA:
-        b, x = ['CpuEa = CpuPC | $FF'], 3
+        b, x = ['CpuEa = (CpuPC | $FF) & $FFFF'], 3
     elif m == 0xB:
         b, x = [f'CpuEa = ({r} + ((CpuA << 8) | CpuB)) & $FFFF'], 4
     elif m == 0xC:
@@ -446,7 +508,7 @@ for pb in range(256):
     DOC_IX.append(pb)
 
 # ------------------------------------------------------------ emit source
-REGS = args.regs or 'CpuPC = r8, CpuA = r9, CpuRes = r10, CpuLeft = r11, CpuB = r4, CpuFZ = r5'
+REGS = args.regs or 'CpuPC = r8, CpuA = r9, CpuFN = r10, CpuLeft = r11, CpuB = r4, CpuFZ = r5'
 
 
 def asm_fetch_tail(table, target):
@@ -484,9 +546,10 @@ def build(target):
 EnableExplicit
 Declare.i CpuBusRead(addr.i)
 Declare CpuBusWrite(addr.i, value.i)
-Global Dim CpuRdMap.i(256)
+Global Dim CpuRdMap.i(512)
 Global Dim CpuWrMap.i(256)
 Global Dim CpuSink.a(256)
+Global Dim CpuPshCount.a(256)   ; bytes a PSH/PUL postbyte moves
 Global Dim Dispatch1.Label(256)
 Global Dim Dispatch2.Label(256)
 Global Dim Dispatch3.Label(256)
@@ -521,6 +584,14 @@ Macro RdB(rbDst, rbAdr)
     rbDst = PeekA(CpuPg + (rbAdr))
   Else
     rbDst = CpuIoRead(rbAdr)
+  EndIf
+EndMacro
+Macro RdSB(rsDst, rsAdr)
+  CpuPg = CpuRdMap((rsAdr) >> 8)
+  If CpuPg
+    rsDst = PeekB(CpuPg + (rsAdr))
+  Else
+    rsDst = (CpuIoRead(rsAdr) ! 128) - 128
   EndIf
 EndMacro
 Macro WrB(wbAdr, wbVal)
@@ -585,7 +656,7 @@ EndMacro
 
 ProcedureRAM.i CpuIoRead(addr.i)
   CutWindow()
-  ProcedureReturn CpuBusRead(addr) & 255
+  ProcedureReturn CpuBusRead(addr & $FFFF) & 255
 EndProcedure
 ProcedureRAM CpuIoWrite(addr.i, value.i)
   CutWindow()
@@ -654,7 +725,7 @@ ProcedureRAM.i CpuRegGet(code.i, asSource.i)
     Case 2 : v = CpuY
     Case 3 : v = CpuU
     Case 4 : v = CpuS
-    Case 5 : v = CpuPC
+    Case 5 : v = CpuPC & $FFFF
     Case 8 : v = CpuA | $FF00
     Case 9 : v = CpuB | $FF00
     Case $A
@@ -715,6 +786,7 @@ Procedure CpuMapPages(first.i, count.i, host.i, writable.i)
   For i = 0 To count - 1
     p = (first + i) & 255
     CpuRdMap(p) = host + i * 256 - p * 256
+    CpuRdMap(p + 256) = CpuRdMap(p) - 65536
     If writable
       CpuWrMap(p) = CpuRdMap(p)
     Else
@@ -727,6 +799,7 @@ Procedure CpuMapIo(first.i, count.i)
   Protected i.i
   For i = 0 To count - 1
     CpuRdMap((first + i) & 255) = 0
+    CpuRdMap(((first + i) & 255) + 256) = 0
     CpuWrMap((first + i) & 255) = 0
   Next
 EndProcedure
@@ -759,6 +832,8 @@ EndProcedure
 
     # ------------------------------------------------- CpuRun
     emit('ProcedureRAM.i CpuRun(n.i)')
+    if args.locals:
+        emit('  Protected ' + ', '.join(x + '.i' for x in args.locals.split(',')))
     emit('; Each handler owns its tail. Assembly implements only the computed dispatch;')
     emit('; operands and instruction semantics are PureMetal.')
     emit('Macro DispatchNext()', '  CompilerIf #CPU_ASM_TAIL = 1')
@@ -783,6 +858,7 @@ EndProcedure
          '      Dispatch1(CpuInitIndex) = ?Illegal1',
          '      Dispatch2(CpuInitIndex) = ?Illegal2',
          '      Dispatch3(CpuInitIndex) = ?Illegal3',
+         '      CpuPshCount(CpuInitIndex) = (CpuInitIndex & 1) + ((CpuInitIndex >> 1) & 1) + ((CpuInitIndex >> 2) & 1) + ((CpuInitIndex >> 3) & 1) + 2 * (((CpuInitIndex >> 4) & 1) + ((CpuInitIndex >> 5) & 1) + ((CpuInitIndex >> 6) & 1) + ((CpuInitIndex >> 7) & 1))',
          '    Next')
     for page in (1, 2, 3):
         for op in sorted(HANDLERS[page]):
@@ -905,6 +981,7 @@ Illegal3:
     EndIf
   EndIf
 Finish:
+  CpuPC = CpuPC & $FFFF
   CpuTmp = CpuBudget - CpuLeft
   CpuBudget = 0
   CompilerIf #CPU_TIMING = 1
