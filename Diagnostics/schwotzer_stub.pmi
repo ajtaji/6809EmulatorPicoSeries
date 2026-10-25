@@ -1,0 +1,7 @@
+; Stand-in for W. Schwotzer's MC6809 validation program, which is third-party and not part of
+; this repository. tools/fetch_schwotzer.ps1 downloads, assembles and embeds the real one as
+; Diagnostics/schwotzer.pmi; with this stub the verifier reports the test as SKIPPED.
+DataSection
+Schwotzer:
+  Data.a $00,$00,$00,$00
+EndDataSection

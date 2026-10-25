@@ -17,11 +17,11 @@
 ;
 ; Build (PowerShell; tools/build_desktop.ps1 does this):
 ;   pbcompilerc.exe desktop\m6809.pb /OPTIMIZER /THREAD /DPIAWARE /EXE desktop\build\m6809.exe
-;     /CONSTANT GL_ENGINE_DIR$=C:/Users/ajtaj/Desktop/Neon-Arcade-Dispay-Engine/
+;     /CONSTANT GL_ENGINE_DIR$=<the Neon Arcade Display Engine folder, with a trailing slash>
 ; ======================================================================
 EnableExplicit
 CompilerIf Defined(GL_ENGINE_DIR$, #PB_Constant) = 0
-  #GL_ENGINE_DIR$ = "C:/Users/ajtaj/Desktop/Neon-Arcade-Dispay-Engine/"
+  #GL_ENGINE_DIR$ = "../../Neon-Arcade-Dispay-Engine/"   ; a clone beside this repository
 CompilerEndIf
 #CPU_TIMING = 1
 #CPU_ASM_TAIL = 0
@@ -69,8 +69,14 @@ Procedure LoadProgram(file$)
   For i = 0 To 65535 : Mem(i) = 0 : Next
   n = LoadS19(file$)
   If n <= 0
-    Report("Load failed: " + file$ + " is not a readable S-record file")
+    Report("Not loaded: " + file$ + " is missing or not an S-record file; the built-in greeting is loaded instead")
     ProgramFile$ = ""
+    ; LDX #$1010 / loop: LDA ,X+ / BEQ end / STA $FF00 / BRA loop / end: BRA end, then the text
+    LoadBytes($1000, "8E 10 10 A6 80 27 05 B7 FF 00 20 F7 20 FE")
+    For i = 1 To Len("MC6809 ready - load an S-record program (Load S19)")
+      Mem($100F + i) = Asc(Mid("MC6809 ready - load an S-record program (Load S19)", i, 1))
+    Next
+    ProgramStart = $1000
   Else
     ProgramFile$ = file$
     If LoadStart >= 0 : ProgramStart = LoadStart : EndIf

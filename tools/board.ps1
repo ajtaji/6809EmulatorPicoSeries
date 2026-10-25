@@ -1,9 +1,7 @@
-# Build and run programs on the shared Pico W (COM7) under ONE bench lease,
-# taken and released only through C:\PMFBuild\board-leases\lease.ps1 (the
-# coordinator's rule). Everything is compiled before the lease is taken, so the
-# board is held only for the uploads and captures.
-#   powershell -ExecutionPolicy Bypass -File tools\board.ps1 -Programs Diagnostics/verify-timed-i.picow,src/demo.picow -Seconds 30
-# Each program's log: build\<name>.uf2.build.log
+# Build programs, then upload each to a Pico on -Port and capture its USB serial output.
+# Everything is compiled first, so a shared board (see BOARD_LEASE_SCRIPT below) is held only
+# for the uploads and captures. Each program's log: build\<name>.uf2.build.log
+#   powershell -ExecutionPolicy Bypass -File tools\board.ps1 -Programs Diagnostics/verify-timed-b.picow,src/demo.picow -Port COM7 -Seconds 30
 param(
     [Parameter(Mandatory)] [string[]]$Programs,
     [int]$Seconds = 30,
@@ -20,25 +18,31 @@ foreach ($p in $Programs) {
     $name = [IO.Path]::GetFileName($p).Replace('.', '-')
     $out = "build/$name.uf2"
     & $build -Source $p -Output $out | Out-Null
-    # refuse an image that reaches the NES ROM store at flash $10050000
+    # every image here stays below flash offset $50000, leaving the rest of the flash to
+    # whatever else lives on the board (a game store, saved disks)
     $uf2 = [IO.File]::ReadAllBytes((Join-Path $root $out)); $imageEnd = 0
     for ($o = 0; $o -lt $uf2.Length; $o += 512) {
         $e = [BitConverter]::ToUInt32($uf2, $o + 12) + [BitConverter]::ToUInt32($uf2, $o + 16)
         if ($e -gt $imageEnd) { $imageEnd = $e }
     }
-    if ($imageEnd -gt 0x10050000) { throw ('{0} reaches 0x{1:X8}, past the NES ROM store: nothing uploaded' -f $p, $imageEnd) }
+    if ($imageEnd -gt 0x10050000) { throw ('{0} reaches 0x{1:X8}, past flash offset $50000: nothing uploaded' -f $p, $imageEnd) }
     $jobs += ,@($p, $out)
 }
-. C:\PMFBuild\board-leases\lease.ps1
-$minutes = [Math]::Ceiling($jobs.Count * ($Seconds + 25) / 60)
-$lease = Get-BoardLease -Port $Port -Owner '6809-core' -Minutes $minutes
+# On a bench where several people share boards, $env:BOARD_LEASE_SCRIPT names a script that
+# provides Get-BoardLease / Release-BoardLease; without it the board is simply used.
+$lease = $null
+if ($env:BOARD_LEASE_SCRIPT -and (Test-Path $env:BOARD_LEASE_SCRIPT)) {
+    . $env:BOARD_LEASE_SCRIPT
+    $minutes = [Math]::Ceiling($jobs.Count * ($Seconds + 25) / 60)
+    $lease = Get-BoardLease -Port $Port -Owner '6809-core' -Minutes $minutes
+}
 try {
     foreach ($j in $jobs) {
         try { & $build -Source $j[0] -Output $j[1] -Port $Port -Seconds $Seconds | Out-Null }
         catch { Write-Output "[$($j[0])] upload/capture failed: $_" }
     }
 } finally {
-    Release-BoardLease $lease
+    if ($lease) { Release-BoardLease $lease }
 }
 foreach ($j in $jobs) {
     $tag = [IO.Path]::GetFileName($j[0])

@@ -349,8 +349,9 @@ Procedure.i SchwotzerTest()
   Protected total.i, t0.i, ok.i, i.i, text$
   For i = 0 To 65535 : Mem(i) = 0 : Next
   If LoadS19(TestRoot$ + "Diagnostics\schwotzer.s19") <= 0
-    Report("Schwotzer: cannot read Diagnostics\schwotzer.s19")
-    ProcedureReturn 0
+    ; third-party, not in the repository: tools\fetch_schwotzer.ps1 adds it
+    Report("Schwotzer validation SKIPPED: Diagnostics\schwotzer.s19 not present (see tools\fetch_schwotzer.ps1)")
+    ProcedureReturn 1
   EndIf
   CpuMapPages(0, 256, @Mem(0), 1)
   CpuMapIo($FF, 1)
@@ -436,7 +437,9 @@ Procedure.i RunAllSuites()
     EndIf
   Next
   If SchwotzerTest() = 0 : total + 1 : EndIf
-  If DisasmCheck() <> 0 : total + 1 : EndIf
+  k = DisasmCheck()
+  If k > 0 : total + 1 : EndIf
+  If k < 0 : Report("disassembler check SKIPPED: Diagnostics\schwotzer.lst not present (see tools\fetch_schwotzer.ps1)") : EndIf
   ProcedureReturn total
 EndProcedure
 

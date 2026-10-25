@@ -5,4 +5,12 @@ tools/refgen/*.exe
 tools/refgen/*.obj
 Diagnostics/*.bin
 Diagnostics/*.lst
-!Diagnostics/schwotzer.lst
+# W. Schwotzer's validation program is third-party: fetched locally by tools/fetch_schwotzer.ps1
+Diagnostics/upstream/
+Diagnostics/schwotzer.s19
+Diagnostics/schwotzer.lst
+Diagnostics/schwotzer.pmi
+Diagnostics/schwotzer_data.pico
+Diagnostics/schwotzer_data.pmi
+# repository metadata for publishing, not committed
+PUBLISH-META.txt

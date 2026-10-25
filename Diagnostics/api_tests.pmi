@@ -171,10 +171,16 @@ Procedure SchwotzerTest()
     If ln = 0
       Break
     EndIf
+    ok = 1
     For k = 0 To ln - 1
       Mem((seg + k) & $FFFF) = ByteIn()
     Next
   ForEver
+  If ok = 0
+    ; the program is third-party and not in the repository: tools/fetch_schwotzer.ps1 adds it
+    Say("Schwotzer validation SKIPPED: program not present (see tools/fetch_schwotzer.ps1)") : Eol()
+    ProcedureReturn
+  EndIf
   CpuMapPages(0, 256, @Mem(0), 1)
   CpuMapIo($FF, 1)
   CaptureMode = 1 : CapLen = 0

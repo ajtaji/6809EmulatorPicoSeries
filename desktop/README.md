@@ -10,9 +10,9 @@ suites the Pico W passes.
 |---|---|
 | `cpu6809.pbi` | The core (generated). The API is the Pico core's, names unchanged — see the main README. `.i` is 64-bit here. |
 | `disasm6809.pbi` + `disasm6809_table.pbi` | `CpuDisasm(addr)` → text, length in `CpuDisasmLen`. The table is generated from the core's handler list. |
-| `testsuite.pbi` | The board verifier, ported: the vectors (read at run time from `Diagnostics/vectors_*.pico`), the API/interrupt/bus checks, Schwotzer's program, the disassembler against asm6809's listing, the benchmark mixes. |
+| `testsuite.pbi` | The board verifier, ported: the vectors (read at run time from `Diagnostics/vectors_*.pmi`), the API/interrupt/bus checks, Schwotzer's program and the disassembler against asm6809's listing (both SKIPPED unless `tools/fetch_schwotzer.ps1` has fetched the program), the benchmark mixes. |
 | `verify_console.pb` | Console run of every suite (exit code = failures). |
-| `m6809.pb` | The program: loads an S-record (Schwotzer's validation program by default), registers and flags, disassembly around PC with click-to-break, a memory view with go-to, the `$FF00` output port, Run/Pause (F5), Step (F10), Reset, Load, the measured speed, and a Tests tab that runs every suite. |
+| `m6809.pb` | The program: loads an S-record (Schwotzer's validation program when fetched, otherwise a built-in greeting), registers and flags, disassembly around PC with click-to-break, a memory view with go-to, the `$FF00` output port, Run/Pause (F5), Step (F10), Reset, Load, the measured speed, and a Tests tab that runs every suite. |
 | `dispatch_bench.pb` | The dispatch measurement below. |
 | `verify_select.pb` | The real core with a central `Select` instead of labels-as-values (measurement only). |
 
@@ -67,6 +67,5 @@ lock to a waiting frame: a mutex is not fair, and without the flag the worker
 re-took it at once and each frame waited ~380 ms.
 
 The GL context is made current once (by `OpenGLWindow`), never per frame: on this
-PC `wglMakeCurrent` costs 8-80 ms a call (found by the C64 session the same day;
-see its shared note). With both fixes the window opens in 0.25 s and draws at well
-over 60 frames a second while the CPU runs at ~410 MHz-equivalent beside it.
+PC `wglMakeCurrent` costs 8-80 ms a call. With both fixes the window opens in
+0.25 s and draws at well over 60 frames a second while the CPU runs at ~410 MHz-equivalent beside it.

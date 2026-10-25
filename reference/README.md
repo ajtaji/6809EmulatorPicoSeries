@@ -5,7 +5,8 @@
   headers are compiled, on the host, into tools/refgen/refgen.exe (tools/refgen/build.cmd).
 - asm6809 2.17 (Ciaran Anscomb), https://www.6809.org.uk/asm6809/dl/asm6809-2.17-w64.zip,
   SHA-256 94084cb72dfdeaab85cfd043ea35eefa05cc0bd30c05baf4f31c95981502e774, unpacked to
-  reference/asm6809/. GPLv3. Assembles Diagnostics/upstream/6809test.asm.
+  reference/asm6809/. GPLv3. Assembles the validation program (tools/fetch_schwotzer.ps1).
 - W. Schwotzer's "MC6809 CPU Emulation Validation" (6809test.asm, tested on an SGS-Thomson
   EF6809P), from https://github.com/hoglet67/6809Decoder test/assembler/6809test.asm at
-  4f7e1846375024888ad7987bd390f434897953cf; a copy is in Diagnostics/upstream.
+  4f7e1846375024888ad7987bd390f434897953cf; third-party, NOT in this repository -
+  tools/fetch_schwotzer.ps1 downloads it into Diagnostics/upstream (ignored by git).

@@ -1,259 +1,243 @@
-# Motorola 6809 for the Pico series — PureMetal
+# MC6809 for the Raspberry Pi Pico series — PureMetal
 
-A fast MC6809 interpreter for the Raspberry Pi Pico W (RP2040) and Pico 2 W
-(RP2350), written in PureMetal. `CpuRun` executes from SRAM and dispatches
-through 256-entry `.Label` tables (page 1, page 2 = `$10`, page 3 = `$11`, and
-one for indexed postbytes); every handler ends in its own inlined computed jump,
-so no procedure is called per guest instruction.
+A fast, cycle-counted **Motorola 6809 CPU core** for the Raspberry Pi Pico W
+(RP2040) and the Pico 2 family (RP2350), written in
+[PureMetal](https://forum.ajtaji.com). The interpreter runs from SRAM and
+dispatches through 256-entry label tables with a computed jump at the end of
+every handler — no procedure call per emulated instruction — and on the RP2350
+its dispatch and branches are Cortex-M33 Thumb-2. Memory goes through 256-byte
+page tables, so a machine can map RAM, ROM, write-protected and I/O pages (an
+MMU such as the Tandy CoCo 3's GIME) without slowing plain RAM. The same core
+also builds for Windows as a PureBasic program with a debugger window.
 
-**Status (2026-10-23): verified on a physical Pico W.** Every configuration
-(timed, untimed, plain-PureMetal tail) passes 31,000 one-instruction cases
-against a cycle-exact reference, the API/interrupt checks, and W. Schwotzer's
-full MC6809 validation program. Details under **Verification** and **Speed**.
-**Pico 2 W (RP2350), 2026-10-24: the same twelve runs pass on COM6** (150 MHz); 2026-10-25 the Thumb-2 tail passes them again (on COM20) and is up to 45% faster.
+It is verified on silicon against 31,000 one-instruction cases with exact cycle
+counts, interrupt and bus checks, and a full 6809 validation program.
 
-**Desktop:** the same core in PureBasic for Windows, with a Neon Arcade
-debugger window and the same test suites, is in [desktop/](desktop/README.md).
+![The desktop debugger](docs/desktop-running.png)
 
-## Using the core (the machine-facing API)
+## Features
+
+- The **whole documented MC6809 instruction set**: pages 1, 2 (`$10`) and 3
+  (`$11`), every addressing mode including indexed indirect, CC with the half
+  carry, DAA, MUL, SEX, EXG/TFR, PSH/PUL, CWAI and SYNC, SWI/SWI2/SWI3.
+- **IRQ, FIRQ and NMI** as machine-driven lines with correct E-flag stacking
+  (entire state for IRQ/NMI/SWI, PC and CC for FIRQ), NMI disarmed until S is
+  loaded, lines re-sampled after any I/O access or unmasking instruction.
+- **Cycle counts** per instruction, indexed-mode extras and taken long branches
+  included (`#CPU_TIMING = 1`, run windows in E cycles), or an untimed build
+  that budgets instructions for the last bit of speed.
+- **Paged memory with I/O hooks**: 256 read and 256 write page pointers;
+  `CpuMapPages` / `CpuMapIo`; the machine supplies `CpuBusRead` / `CpuBusWrite`
+  for I/O pages only. ROM pages discard writes.
+- Undocumented opcodes stop the core loudly (`CpuStopped`, `CpuBadOpcode`);
+  undocumented indexed postbytes and EXG/TFR codes behave as the silicon does.
+- One generator (`tools/generate.py`) produces the RP2040, RP2350 and desktop
+  cores from a single handler list.
+
+## Supported boards
+
+| Board | Chip | Core file | Verified on silicon |
+|---|---|---|---|
+| Raspberry Pi Pico W | RP2040 (Cortex-M0+, Thumb-1) at 200 MHz | `src/cpu6809.pico` | yes — all suites |
+| Raspberry Pi Pico 2 W, Pimoroni Pico Plus 2 W, Adafruit Feather RP2350 | RP2350 (Cortex-M33, Thumb-2) at 150 MHz | `src/cpu6809.pico2` | yes — all suites (Pico 2 W and Feather RP2350) |
+| Windows x64 | PureBasic 6.41 C back end | `desktop/cpu6809.pbi` | yes — all suites in the console and the window |
+
+This repository is the CPU; it drives no display or sound itself. A machine
+built on it puts the CPU on core 0 and its video and sound on core 1 — the
+Tandy CoCo 3 emulator does exactly that.
+
+## Performance
+
+Each sample is exactly 1,000,000 emulated instructions (untimed build) or a
+1,000,000-cycle budget (timed build), measured on the board with USB outside
+the interval; memory goes through the page tables throughout.
+
+| Mix | Pico W (RP2040, 200 MHz) | Pico 2 family (RP2350, 150 MHz, Thumb-2) |
+|---|---:|---:|
+| `DECB / BNE` loop | 3.67 M instr/s · 9.19 MHz-equiv. | 4.69 M instr/s · 11.55 MHz-equiv. |
+| `ADDA # / EORA # / ASLA / LSRA / ADDD # / ANDCC # / BRA` | 1.93 M · 4.99 MHz | 1.98 M · 5.08 MHz |
+| `LDA ,X+ / STA ,Y+ / DECB / BNE` copy | 2.29 M · 9.49 MHz | 2.46 M · 10.39 MHz |
+| `BSR / PSHS / LDD 2,S / LEAX / PULS / RTS / BRA` | 1.29 M · 8.00 MHz | 1.29 M · 8.06 MHz |
+
+"MHz-equivalent" is the 6809 E clock the timed build sustains. A CoCo 3 runs at
+0.89 or 1.79 MHz, so the core has between 2.8 and 13 times the speed it needs.
+On the RP2350 the Thumb-2 dispatch tail and branches made the register/branch
+mix 45% faster than the same core's Thumb-1 tail (3.23 → 4.69 M instr/s).
+
+On a PC the desktop core runs 645–1,053 MHz-equivalent (timed) and
+157–251 M instr/s (untimed); see [desktop/README.md](desktop/README.md).
+
+## Quick start: the demo firmware
+
+1. Hold **BOOTSEL** while plugging the board into USB; a drive appears.
+2. Copy `firmware/6809-picow.uf2` (Pico W) or `firmware/6809-pico2w.uf2`
+   (Pico 2 family) onto it. The board restarts into the demo.
+3. Open the board's USB serial port in any terminal (the baud rate does not
+   matter). It prints a smoke test (`sum test A=55 PASS`) and then the four
+   benchmark mixes above, once a second.
+
+The demo is built only from this repository and contains no third-party code
+or ROM.
+
+## Using the core in a machine
 
 ```text
-#CPU_TIMING = 1        ; 1: CpuRun's budget is CYCLES and CpuCycles counts them
-                       ; 0: the budget is INSTRUCTIONS (fastest; no cycle accounting)
+#CPU_TIMING = 1        ; 1: CpuRun's budget is E CYCLES and CpuCycles counts them
+                       ; 0: the budget is INSTRUCTIONS (fastest, no cycle accounting)
 #CPU_ASM_TAIL = 1      ; 1: assembly dispatch tail; 0: plain PureMetal computed Goto
-XIncludeFile "src/cpu6809.pico"      ; RP2040   (src/cpu6809.pico2 on the RP2350)
+XIncludeFile "src/cpu6809.pico"      ; RP2040 (src/cpu6809.pico2 on the RP2350)
+
+Procedure.i CpuBusRead(addr.i)            ; the machine defines these two; they are
+  ...                                     ; called only for pages mapped as I/O
+EndProcedure
+Procedure CpuBusWrite(addr.i, value.i)
+  ...
+EndProcedure
 ```
 
-The machine **must define** these two procedures (the core declares them). They
-are called only for pages mapped as I/O:
+### Memory
 
-```text
-Procedure.i CpuBusRead(addr.i)            ; return 0..255
-Procedure CpuBusWrite(addr.i, value.i)    ; value is 0..255
-```
-
-### Memory: 256 page pointers, read and write separately
-
-The 64 KB address space is 256 pages of 256 bytes. `CpuRdMap(page)` and
-`CpuWrMap(page)` each hold **a host address minus `page*256`** (so the byte at
-`addr` is `PeekA(CpuRdMap(addr >> 8) + addr)`), or **0 = call the bus hook**.
-A plain RAM read is one table load, a test and a byte load — no call.
+The 64 KB address space is 256 pages of 256 bytes. Fill the tables only with:
 
 | Call | Effect |
 |---|---|
-| `CpuMapPages(first, count, host, writable)` | Map `count` pages starting at page `first` onto host memory at address `host` (an SRAM array `@Ram(offset)`, PSRAM, or flash for ROM). `writable = 0` makes them read-only: writes go to a 256-byte sink and are discarded. |
+| `CpuMapPages(first, count, host, writable)` | Map `count` pages from page `first` onto host memory at address `host` (an SRAM array `@Ram(n)`, PSRAM, or flash for ROM). `writable = 0` makes them read-only. |
 | `CpuMapIo(first, count)` | Route those pages to `CpuBusRead` / `CpuBusWrite`. |
 
-For the CoCo 3's GIME MMU (8 KB blocks): a block is 32 pages, so a task
-register write is `CpuMapPages(block * 32, 32, @Phys(physBlock * 8192), 1)`.
-ROM, the `$FE` constant page and the `$FF` I/O page are separate 256-byte
-pages, so they can be mapped differently from the block around them (map
-`$FF` with `CpuMapIo($FF, 1)`; vectors `$FFF0-$FFFF` then come through
-`CpuBusRead`, which is where the GIME supplies them from ROM). **Fill the
-tables only through `CpuMapPages` / `CpuMapIo`**: `CpuRdMap` has 512 entries,
-pages 256-511 mirroring 0-255 (shifted by -65536) so the program counter may
-run a few bytes past `$FFFF` before the dispatch wraps it.
+A plain RAM read is one table load, a test and a byte load. A 16-bit access
+inside one page uses one pointer; one that straddles pages goes byte by byte,
+so a word may span RAM and I/O correctly. For an 8 KB MMU block (the CoCo 3
+GIME), map 32 pages: `CpuMapPages(block * 32, 32, @Phys(physBlock * 8192), 1)`.
 
-A 16-bit access within one page is done with two byte loads from the same
-pointer; an access that straddles a page boundary is done byte by byte, so a
-word may span RAM and I/O correctly.
-
-### Registers and state (Globals)
+### Registers and state
 
 | Name | Meaning |
 |---|---|
-| `CpuA`, `CpuB` | Accumulators, 0..255 (D is `CpuA << 8 \| CpuB`) |
-| `CpuX`, `CpuY`, `CpuU`, `CpuS`, `CpuPC` | 16-bit registers, 0..$FFFF |
-| `CpuDPage` | **DP shifted left 8** (DP = `CpuDPage >> 8`) |
-| `CpuGetCC()` / `CpuSetCC(v)` | CC as one byte (E F H I N Z V C). The flags are kept lazily inside; never read `CpuFN`/`CpuFZ`/... directly. |
-| `CpuCycles` | Cycles executed (timed builds), 32-bit, wraps |
-| `CpuStopped`, `CpuBadOpcode` | An undocumented opcode stops the core before executing it: `CpuStopped = 1`, `CpuPC` at its first byte, `CpuBadOpcode` = the opcode (`$10xx` / `$11xx` for pages 2/3). `CpuReset()` clears it. |
+| `CpuA`, `CpuB` | Accumulators 0..255 (D = `CpuA << 8 \| CpuB`) |
+| `CpuX`, `CpuY`, `CpuU`, `CpuS`, `CpuPC` | 16-bit registers |
+| `CpuDPage` | DP shifted left 8 (DP = `CpuDPage >> 8`) |
+| `CpuGetCC()` / `CpuSetCC(v)` | CC as one byte (E F H I N Z V C); the flags are kept lazily inside |
+| `CpuCycles` | Cycles executed (timed builds), updated when a window ends |
+| `CpuStopped`, `CpuBadOpcode` | Set when an undocumented opcode is met; `CpuPC` is left at it |
 | `CpuWaiting`, `CpuSyncing` | 1 while in CWAI or SYNC |
 
-Keep each register within its width when you set it.
-
-### Running
+### Running and interrupts
 
 | Call | Effect |
 |---|---|
-| `CpuReset()` | DP = 0, F and I set, NMI disarmed (until S is loaded, as the silicon), wait states cleared, `CpuPC` = the word at `$FFFE`. Other registers are left as they were. |
-| `CpuRun(n)` | Run a window. Timed builds: **n cycles**; returns the cycles actually used (whole instructions, so it may run past `n` by part of one instruction — carry the difference). Untimed: **n instructions**, returns how many ran. Returns early only when the core stops on an undocumented opcode. |
+| `CpuReset()` | DP = 0, F and I set, NMI disarmed, PC = the word at `$FFFE` |
+| `CpuRun(n)` | Run a window of `n` cycles (timed) or `n` instructions (untimed); returns what it used. Whole instructions, so a timed window may run a few cycles past `n` — carry the difference. |
+| `CpuElapsed()` | Inside a bus hook: the budget used up to the start of the current instruction, for time-stamping I/O |
+| `CpuIrqLine`, `CpuFirqLine` | Level inputs, 0 or 1 |
+| `CpuNmi()` | An NMI edge (ignored until the program has loaded S) |
 
-| `CpuElapsed()` | Inside `CpuBusRead`/`CpuBusWrite`: the budget the current window has used up to the **start** of the instruction making the access (cycles in timed builds). 0 between windows. With the window's start time this gives the machine "now" for an I/O access to within one instruction. |
-
-`CpuRun` returns 0 for `n <= 0` and when stopped. While the CPU is in CWAI or
-SYNC with nothing to wake it, a window consumes its whole budget (time passes)
-and returns `n`.
-
-### Interrupts
-
-| Name | Meaning |
-|---|---|
-| `CpuIrqLine`, `CpuFirqLine` | Level-sensitive inputs: set to 1 (asserted) or 0. |
-| `CpuNmi()` | An NMI edge. Ignored until the program has loaded S. |
-
-Lines are sampled at the start of every `CpuRun` window **and** immediately
-after: any instruction that can unmask (ANDCC, RTI, PULS/PULU of CC, TFR/EXG
-into CC, CWAI, SYNC), and any access to an I/O page. So a line the machine
-raises from inside `CpuBusRead`/`CpuBusWrite` (or with `CpuNmi()` there) is
-taken at the very next instruction boundary, as on the silicon. A line raised
-between windows is taken at the start of the next window. Raising a line
-from outside an I/O hook mid-window is not possible (there is no "mid-window"
-outside the hooks).
-
-IRQ and NMI stack the entire state with E = 1 (12 bytes); FIRQ stacks PC and
-CC with E = 0. NMI and FIRQ set F and I; IRQ sets I. Vectors: NMI `$FFFC`,
-SWI `$FFFA`, IRQ `$FFF8`, FIRQ `$FFF6`, SWI2 `$FFF4`, SWI3 `$FFF2`, reset `$FFFE`.
-CWAI stacks everything and then waits; the interrupt that ends the wait does not
-stack again. SYNC waits for any line, masked or not; a masked one simply ends
-the wait. At least one instruction always executes after an interrupt is taken.
-
-### Cycle counts
-
-Timed builds count the documented MC6809 E cycles per instruction including
-every indexed-mode extra, long-branch-taken, PSH/PUL per byte, RTI with E set,
-and interrupt entry (IRQ/NMI 19, FIRQ 10). They are checked on the board
-against a cycle-exact reference (see Verification). Bus-level detail (dummy
-cycles, the exact cycle within an instruction at which a write lands) is not
-modelled: a write is visible at the end of its instruction.
+A line raised inside `CpuBusRead`/`CpuBusWrite` is taken at the very next
+instruction boundary. CWAI and SYNC with nothing to wake them consume the rest
+of the window, so time keeps passing for the machine.
 
 ### Constraints
 
-- One CPU instance, not reentrant; keep it on one host core.
-- Registers reserved application-wide (both chips): **r8 = CpuPC, r9 = CpuA,
-  r10 = CpuFN, r11 = CpuLeft, r4 = CpuB, r5 = CpuFZ**. PureMetal refuses any
-  library or assembly that conflicts with them.
-- Undocumented opcodes stop the core (loudly); undocumented **indexed
-  postbytes and EXG/TFR register codes** behave as the silicon does (taken from
-  XRoar's hardware-derived behaviour) because they cost nothing extra.
+- One CPU instance; keep it on one core.
+- Registers reserved program-wide: **r8 = CpuPC, r9 = CpuA, r10 = CpuFN,
+  r11 = CpuLeft, r4 = CpuB, r5 = CpuFZ**. PureMetal refuses code that conflicts.
+- Bus-level detail (dummy cycles, the cycle within an instruction at which a
+  write lands) is not modelled: a write is visible at the end of its instruction.
 
-## Build
+## Building from source
 
-PureMetal Forge (`--compile`), no SDK:
+Requirements: **PureMetal Forge** of 2026-10-25 or later (compiler main
+`883c4ae12`; the RP2350 Thumb-2 tail needs it), Windows PowerShell, and
+Python 3 for the generators. No SDK.
 
 ```powershell
-.\tools\build.ps1 -Source src/demo.picow -Output firmware/6809-picow.uf2
-# on the shared bench: one lease (C:\PMFBuild\board-leases\lease.ps1) for a whole batch
-powershell -ExecutionPolicy Bypass -File tools\board.ps1 -Programs Diagnostics/verify-timed-b.picow,src/demo.picow -Seconds 30
+# point the scripts at the compiler once (or pass -Compiler)
+$env:PUREMETALFORGE = 'C:\path\to\PureMetalForge.exe'
+
+# the demo firmware
+.\tools\build.ps1 -Source src/demo.picow  -Output firmware/6809-picow.uf2
+.\tools\build.ps1 -Source src/demo.pico2w -Output firmware/6809-pico2w.uf2
+
+# build, upload to the board on COM7 and show its output
+powershell -ExecutionPolicy Bypass -File tools\board.ps1 -Programs src/demo.picow -Port COM7 -Seconds 15
 ```
 
-The core is generated: edit `tools/generate.py`, then `py -3 tools/generate.py`.
+The cores are generated: edit `tools/generate.py`, then run
+`py -3 tools/generate.py` (it rewrites `src/cpu6809.pico`, `src/cpu6809.pico2`
+and the desktop core).
 
-## Verification (all on the physical Pico W, COM7, 200 MHz)
+## Testing
 
-Three independent checks, each run by `Diagnostics/verify_body.pico` on the board:
+Everything below runs on the board itself; nothing is emulated on the host.
 
-1. **One-instruction vectors against a cycle-exact reference.** No published
-   per-instruction suite exists for the 6809 (SingleStepTests has none), so
-   `tools/refgen` builds XRoar's MC6809 core (hardware-derived, used for
-   cycle-exact Dragon/CoCo emulation) on the host and records the end state of
-   each case: all registers, CC, the cycle count, the CWAI wait state and every
-   byte written. A case's *input* is not stored: the board regenerates it from
-   the case number (xorshift32 registers, a hashed background for all 64 KB,
-   the opcode, a documented postbyte, random operand bytes), so ~20 bytes per
-   case suffice. After each case the board restores the background and checks
-   a whole-memory sum every 64 cases, so a stray write anywhere fails loudly.
-   - Batches b, c, d: 27,000 cases, every documented opcode of pages 1-3 about
-     100 times each, all 217 documented indexed postbytes, all EXG/TFR codes
-     and PSH/PUL masks.
-   - Batch i: 4,000 interrupt cases - IRQ, FIRQ and NMI asserted (masked and
-     not) on ordinary instructions, SYNC with each line, CWAI both waiting and
-     taking an interrupt at once.
-   - One deliberate deviation from the oracle: XRoar charges TSTA/TSTB 3
-     cycles; the datasheet, MAME and hoglet67's bus-capture decoder all say 2,
-     and the core uses 2 (refgen adjusts those two opcodes, only when the
-     TST itself ran rather than an interrupt).
-   - XRoar ends a CWAI "step" right after the stacking; refgen runs on to the
-     wait, or to the interrupt CWAI takes at once plus the handler's first
-     instruction (the board runs that as a second window).
-2. **API, bus-hook and interrupt checks** (`Diagnostics/api_tests.pico`):
-   zero/negative budgets, undocumented opcodes stopping on pages 1 and 2,
-   reset, NMI ignored until S is loaded, I/O-page reads and writes, a word
-   straddling an I/O page and RAM, a ROM page discarding writes, an IRQ raised
-   inside a bus write taken at the very next instruction, FIRQ stacking,
-   CWAI and SYNC waits, self-modifying code, cycle-window lengths.
-3. **W. Schwotzer's "MC6809 CPU Emulation Validation"** (validated on an
-   SGS-Thomson EF6809P; from hoglet67/6809Decoder), assembled with asm6809
-   and run as a whole program: it prints "All Tests succeded".
+1. **31,000 one-instruction cases with exact cycles.** No published
+   per-instruction suite exists for the 6809, so `tools/refgen` builds the
+   MC6809 of [XRoar](https://www.6809.org.uk/xroar/) (a hardware-derived,
+   cycle-exact emulator) on the PC and records each case's end state: every
+   register, CC, the cycle count, the CWAI wait state and every byte written.
+   The board regenerates each case's input from its number, so the vectors are
+   ~20 bytes a case. Batches b, c, d cover every documented opcode about 100
+   times, all 217 documented indexed postbytes and every EXG/TFR and PSH/PUL
+   mask; batch i is 4,000 interrupt cases (IRQ/FIRQ/NMI masked and not, SYNC,
+   CWAI). XRoar charges TSTA/TSTB 3 cycles where the datasheet, MAME and a
+   bus-capture decoder all say 2; the core uses 2.
+2. **API, bus and interrupt checks**: budgets, undocumented opcodes, reset, NMI
+   arming, I/O reads and writes, a word straddling I/O and RAM, ROM pages, an
+   IRQ raised inside a bus write, FIRQ stacking, CWAI/SYNC waits,
+   self-modifying code, window lengths.
+3. **W. Schwotzer's "MC6809 CPU Emulation Validation"** program (validated on a
+   real EF6809P) as a whole program. It is third-party and **not included**:
+   `tools/fetch_schwotzer.ps1` downloads it at a pinned commit, assembles it
+   with [asm6809](https://www.6809.org.uk/asm6809/) and embeds it. Without it
+   the test reports SKIPPED.
 
-| Configuration | Batches b, c, d (27,000) | Batch i (4,000 interrupt) | API checks | Schwotzer |
-|---|---|---|---|---|
-| Timed, assembly tail | PASS (cycles compared) | PASS (cycles compared) | PASS | PASS |
-| Untimed, assembly tail | PASS | PASS | PASS | PASS |
-| Timed, plain PureMetal computed `Goto` | PASS (cycles compared) | PASS (cycles compared) | PASS | PASS |
+```powershell
+py -3 tools/make_wrappers.py                     # writes the per-chip wrappers
+powershell -ExecutionPolicy Bypass -File tools\fetch_schwotzer.ps1 -Asm6809 C:\path\to\asm6809.exe   # optional
+powershell -ExecutionPolicy Bypass -File tools\board.ps1 -Programs Diagnostics/verify-timed-b.picow -Port COM7
+```
 
-Twelve board runs, all on the same core; captured verdicts in
-`docs/verification.log`. The same twelve pass on the Pico 2 W (RP2350, COM6,
-150 MHz): `docs/verification-pico2w.log`. Schwotzer's program runs 180,050 cycles in about
-20 ms (23 ms with the plain tail).
+Each wrapper (`Diagnostics/verify-<timed|fast|pure>-<b|c|d|i>.<picow|pico2w>`)
+runs one vector batch, the API checks, the validation program and the benchmark.
+Results on silicon, all twelve configurations on both chips: **all PASS** —
+`docs/verification.log` (Pico W), `docs/verification-pico2w.log` and
+`docs/verification-pico2w-thumb2.log` (RP2350).
 
-## Speed (Pico W, RP2040 at 200 MHz)
+## Desktop version
 
-Each sample executes exactly 1,000,000 guest instructions (untimed build) or a
-1,000,000-cycle budget (timed build); USB and setup are outside the interval.
-Memory goes through the page tables in every measurement.
+[desktop/](desktop/README.md) has the same core for Windows (PureBasic 6.41,
+C back end, labels-as-values dispatch), a console test runner that passes the
+same suites, a disassembler, and a debugger window drawn with the
+[Neon Arcade Display Engine](https://github.com/ajtaji/Neon-Arcade-Dispay-Engine):
+registers and flags, disassembly with breakpoints, memory, the program's
+output, run / step / pause, and a Tests tab.
 
-| Mix | Initial | Tuned (untimed) | Tuned, timed build |
-|---|---:|---:|---:|
-| `DECB / BNE` loop | 3.20 M instr/s | **3.67 M instr/s** | 9.19 MHz-equivalent |
-| `ADDA # / EORA # / ASLA / LSRA / ADDD # / ANDCC # / BRA` | 1.65 M | **1.93 M** | 4.99 MHz |
-| `LDA ,X+ / STA ,Y+ / DECB / BNE` copy | 2.05 M | **2.29 M** | 9.49 MHz |
-| `BSR / PSHS D,X / LDD 2,S / LEAX 1,X / PULS D,X / RTS / BRA` | 1.20 M | **1.29 M** | 8.00 MHz |
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build_desktop.ps1 -Engine C:/path/to/Neon-Arcade-Dispay-Engine/
+desktop\bin\m6809.exe [program.s19] [tests] [run]
+```
 
-"MHz-equivalent" is the E clock the timed build sustains: a CoCo 3 runs at
-0.89 or 1.79 MHz, so the core has 2.8x-10x headroom at full speed. The timed
-build is faster in E-cycle terms because 6809 instructions average several
-cycles each.
+## ROMs and programs
 
-What made it faster (measured; see `tools/hotpath.py` for the static counts):
-operand temporaries as `CpuRun` locals and N held in r10 instead of a scratch
-value; PC left unwrapped after operand bytes (the read table is mirrored past
-`$FFFF`; the dispatch tail wraps); `PeekB` for branch offsets; inherent A/B
-operations written on the register; PSH/PUL through one page pointer when the
-frame is inside one page; ANDCC re-checking interrupts only when it unmasks.
-Reserving a seventh register (the page pointer in r6) made every handler longer
-— the code generator needs r6 as scratch — and was dropped, as with the 6502.
+The core needs no ROM. The demo programs are written in this repository; the
+validation program is fetched by the user (above). A machine built on the core
+(for example a CoCo 3) needs that machine's own ROMs — take them from a machine
+you own; none are distributed here.
 
-### RP2350 (Pico 2 series) at its default 150 MHz: Thumb-2 tail and branches
+## Known limits
 
-On the RP2350 the dispatch tail and the 16 short branches are Cortex-M33
-Thumb-2 (2026-10-25, compiler main `9777f6cd6`): PC stays in r8 with scaled
-index loads and `uxth` on the high register, the cycle budget is one
-`subs r11, r11, #n`, the far exits are `beq.w`/`ble.w`, and a branch is the
-flag test plus one signed load through the page table (a PureMetal path takes
-an I/O page). The RP2040 build is unchanged (Thumb-1) and its figures did not
-move with the new compiler.
+- Undocumented 6809 opcodes are not executed; they stop the core.
+- No bus-cycle-level timing (dummy reads, the exact write cycle).
+- HALT and DMA are not modelled; a machine that needs them pauses `CpuRun`.
 
-| Mix | Before (Thumb-1 tail) | After (Thumb-2) | Timed before | Timed after |
-|---|---:|---:|---:|---:|
-| register/branch | 3.23 M/s | **4.69 M/s** (+45%) | 7.90 MHz | **11.55 MHz** |
-| arithmetic | 1.76 M/s | **1.98 M/s** (+13%) | 4.58 MHz | **5.13 MHz** |
-| indexed copy | 2.09 M/s | **2.45 M/s** (+17%) | 8.69 MHz | **10.31 MHz** |
-| call/stack | 1.20 M/s | **1.30 M/s** (+8%) | 7.41 MHz | **8.02 MHz** |
+## Licence and credits
 
-Measured on the Feather RP2350 (COM20) for both columns (the Pico 2 W on COM6
-had stopped answering); the "before" column reproduces the earlier Pico 2 W
-figures to the microsecond. Schwotzer's program: 22.0 ms → 18.6 ms. All twelve
-verification runs pass with the Thumb-2 build
-(`docs/verification-pico2w-thumb2.log`). `firmware/6809-pico2w.uf2` is the
-Thumb-2 demo as it ran there.
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 ajtaji.
 
-Since compiler `883c4ae12` (forum 1412/1416 fixed) the dispatch ends in one
-`ldr pc, [r1, r2, lsl #2]` instead of `ldr` + `bx`. Same board, same compiler,
-before → after: untimed 4.41 / 1.98 / 2.43 / 1.30 → **4.69 / 1.98 / 2.46 /
-1.29** M instr/s; timed 11.73 / 5.06 / 10.39 / 8.06 → 11.55 / 5.08 / 10.39 /
-8.06 MHz-equivalent; Schwotzer's program 18.99 → 18.80 ms. The unchanged
-`ldr`+`bx` core measured 4.69 under the previous compiler and 4.41 under this
-one, so code placement alone moves these mixes by about 6%: the change is one
-instruction shorter and faster on the real program, and within placement noise
-on the micro-mixes. All twelve runs pass again. The far exits keep their
-explicit `.w` (forum 1415, now also fixed in the assembler).
-
-Sizes: the demo is 92 KB of flash; 79 KB of the core runs from SRAM (RP2040),
-77.6 KB on the RP2350.
-
-## Credits
-
-- Reference oracle: [XRoar](https://www.6809.org.uk/xroar/)'s MC6809 by Ciaran
-  Anscomb (GPLv3), built on the host only to compute expected states
-  (`tools/refgen`). It does not run on the board and is not part of the core.
+- [XRoar](https://www.6809.org.uk/xroar/) by Ciaran Anscomb (GPLv3) is the
+  reference the test vectors were computed with on the PC (`tools/refgen`
+  compiles against a separate clone; no XRoar code is in this repository).
+- W. Schwotzer's validation program (via
+  [hoglet67/6809Decoder](https://github.com/hoglet67/6809Decoder)) and
+  [asm6809](https://www.6809.org.uk/asm6809/) are fetched, not included.
+- MAME's 6809 tables and hoglet67's bus-capture decoder settled the TSTA/TSTB
+  cycle count.

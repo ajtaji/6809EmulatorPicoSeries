@@ -1,5 +1,9 @@
+# Compile one PureMetal program (and optionally upload it and capture the board's USB serial).
+#   .\tools\build.ps1 -Source src/demo.picow -Output firmware/6809-picow.uf2
+#   .\tools\build.ps1 -Source src/demo.picow -Output build/demo.uf2 -Port COM7 -Seconds 15
 param(
-    [string]$Compiler = 'C:\Users\ajtaj\Desktop\Github\PureBasicCode\OpenGl Work\ArduinoBasic\PureMetalForge.exe',
+    # PureMetal Forge's executable: -Compiler, or the PUREMETALFORGE environment variable
+    [string]$Compiler = $(if ($env:PUREMETALFORGE) { $env:PUREMETALFORGE } else { 'PureMetalForge.exe' }),
     [string]$Source = 'src/demo.picow',
     [string]$Output = 'firmware/6809-picow.uf2',
     [string]$Port = '',

@@ -15,6 +15,12 @@ for ext, (lib, cext, khz) in CHIPS.items():
             lines += [f'XIncludeFile "{lib}/Lib/{m}.{cext}"' for m in ('clocks', 'timer', 'uart', 'usb_serial', 'safety')]
             lines += [f'XIncludeFile "../src/cpu6809.{cext}"', f'XIncludeFile "../src/io.{cext}"',
                       'XIncludeFile "verify_body.pmi"', f'XIncludeFile "vectors_{batch}.pmi"',
-                      'XIncludeFile "schwotzer_data.pmi"']
+                      'XIncludeFile "schwotzer.pmi"']
             (root / f'verify-{cfg}-{batch}.{ext}').write_text('\n'.join(lines) + '\n')
+# W. Schwotzer's validation program is third-party and not committed: schwotzer.pmi is either
+# the real program (tools/fetch_schwotzer.ps1) or this empty stub, and the verifier says SKIPPED.
+target = root / 'schwotzer.pmi'
+if not target.exists():
+    target.write_text((root / 'schwotzer_stub.pmi').read_text())
+    print('schwotzer.pmi: stub (run tools/fetch_schwotzer.ps1 for the real program)')
 print('wrappers written')

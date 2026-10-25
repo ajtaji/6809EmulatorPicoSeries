@@ -1,11 +1,17 @@
 # Builds the desktop programs (PureBasic 6.41 x64, C back end) into desktop\build and runs
 # the console verifier in both timing modes. Run from PowerShell:
 #   powershell -ExecutionPolicy Bypass -File tools\build_desktop.ps1
+# PureBasic's C-back-end compiler and the Neon Arcade Display Engine folder (trailing slash):
+# parameters, or the PBCOMPILERC and NEON_ENGINE_DIR environment variables
+param(
+    [string]$Pb = $(if ($env:PBCOMPILERC) { $env:PBCOMPILERC } else { 'C:\Program Files\PureBasic\Compilers\pbcompilerc.exe' }),
+    [string]$Engine = $(if ($env:NEON_ENGINE_DIR) { $env:NEON_ENGINE_DIR } else { '../Neon-Arcade-Dispay-Engine/' })
+)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
-$pb = 'C:\Program Files\PureBasic\Compilers\pbcompilerc.exe'
-$engine = 'C:/Users/ajtaj/Desktop/Neon-Arcade-Dispay-Engine/'
+$pb = $Pb
+$engine = $Engine
 New-Item -ItemType Directory -Force desktop\build | Out-Null
 & py -3 tools\generate.py | Out-Null
 foreach ($t in 1, 0) {
