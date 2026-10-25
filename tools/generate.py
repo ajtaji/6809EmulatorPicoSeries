@@ -273,6 +273,47 @@ COND = {
     0xE: ('BGT', '((CpuFN ! CpuFV) & $80) = 0 And CpuFZ <> 0'),
     0xF: ('BLE', '((CpuFN ! CpuFV) & $80) <> 0 Or CpuFZ = 0'),
 }
+# ---- Thumb-2 short branches (RP2350 with the assembly tail) ----
+# The flag test, the signed offset read through the page table and the new PC in one
+# block; an I/O page falls back to the PureMetal path. Other targets keep `plain`.
+T2_COND = {
+    0x0: [],
+    0x2: ['ldr r0, =global_cpufc', 'ldr r0, [r0]', 'and r0, r0, #0x100', 'cmp r5, #0', 'it eq', 'moveq r0, #1',
+          'cmp r0, #0', 'bne {skip}'],
+    0x3: ['ldr r0, =global_cpufc', 'ldr r0, [r0]', 'and r0, r0, #0x100', 'cmp r5, #0', 'it eq', 'moveq r0, #1',
+          'cmp r0, #0', 'beq {skip}'],
+    0x4: ['ldr r0, =global_cpufc', 'ldr r0, [r0]', 'tst r0, #0x100', 'bne {skip}'],
+    0x5: ['ldr r0, =global_cpufc', 'ldr r0, [r0]', 'tst r0, #0x100', 'beq {skip}'],
+    0x6: ['cmp r5, #0', 'beq {skip}'],
+    0x7: ['cmp r5, #0', 'bne {skip}'],
+    0x8: ['ldr r0, =global_cpufv', 'ldr r0, [r0]', 'tst r0, #0x80', 'bne {skip}'],
+    0x9: ['ldr r0, =global_cpufv', 'ldr r0, [r0]', 'tst r0, #0x80', 'beq {skip}'],
+    0xA: ['tst r10, #0x80', 'bne {skip}'],
+    0xB: ['tst r10, #0x80', 'beq {skip}'],
+    0xC: ['ldr r0, =global_cpufv', 'ldr r0, [r0]', 'eor r0, r0, r10', 'tst r0, #0x80', 'bne {skip}'],
+    0xD: ['ldr r0, =global_cpufv', 'ldr r0, [r0]', 'eor r0, r0, r10', 'tst r0, #0x80', 'beq {skip}'],
+    0xE: ['ldr r0, =global_cpufv', 'ldr r0, [r0]', 'eor r0, r0, r10', 'and r0, r0, #0x80', 'cmp r5, #0', 'it eq',
+          'moveq r0, #1', 'cmp r0, #0', 'bne {skip}'],
+    0xF: ['ldr r0, =global_cpufv', 'ldr r0, [r0]', 'eor r0, r0, r10', 'and r0, r0, #0x80', 'cmp r5, #0', 'it eq',
+          'moveq r0, #1', 'cmp r0, #0', 'beq {skip}'],
+}
+
+
+def t2_branch(op, lo, plain):
+    lab = f'Op{op:02X}'
+    pre = f'__ul_cpurun_{lab.lower()}'
+    asm = [x.format(skip=pre + '_skip') for x in T2_COND[lo]]
+    asm += ['lsr r1, r8, #8', 'ldr r2, =global_cpurdmap', 'ldr r1, [r2, r1, lsl #2]', 'cmp r1, #0',
+            f'beq {pre}_slow', 'ldrsb r2, [r1, r8]', 'add r8, r8, #1', 'add r8, r8, r2', 'uxth r8, r8',
+            f'b {pre}_next']
+    uses = ['CpuPC'] + (['CpuFZ'] if any('r5' in x for x in asm) else []) +            (['CpuFN'] if any('r10' in x for x in asm) else [])
+    return (['!IFPICO2', 'CompilerIf #CPU_ASM_TAIL = 1', '  ASM Uses ' + ', '.join(uses)] +
+            ['    ' + x for x in asm] + ['  EndASM', f'!LABEL {lab}_slow', '  RdSB(CpuVal, CpuPC)',
+             '  CpuPC = (CpuPC + 1 + CpuVal) & $FFFF', f'  Goto {lab}_next', f'!LABEL {lab}_skip',
+             '  CpuPC = CpuPC + 1', f'!LABEL {lab}_next', 'CompilerElse'] +
+            ['  ' + x for x in plain] + ['CompilerEndIf', '!ELSE'] + plain + ['!ENDIF'])
+
+
 for lo, (mn, cond) in COND.items():
     take8 = ['RdSB(CpuVal, CpuPC)', 'CpuPC = (CpuPC + 1 + CpuVal) & $FFFF']
     skip8 = ['CpuPC = CpuPC + 1']
@@ -282,6 +323,8 @@ for lo, (mn, cond) in COND.items():
         body = skip8
     else:
         body = [f'If {cond}'] + ['  ' + s for s in take8] + ['Else'] + ['  ' + s for s in skip8] + ['EndIf']
+    if cond != '0':
+        body = t2_branch(0x20 | lo, lo, body)
     add(1, 0x20 | lo, mn, 'rel8', body, 3)
     # long forms on page 2 ($1021..$102F); LBRA is $16 on page 1
     if lo == 0:
@@ -514,6 +557,19 @@ REGS = args.regs or 'CpuPC = r8, CpuA = r9, CpuFN = r10, CpuLeft = r11, CpuB = r
 def asm_fetch_tail(table, target):
     """Inline computed dispatch: read the opcode at PC through the page map."""
     pcreg = 'r8' if 'CpuPC = r8' in REGS else 'r4'
+    if target == 'pico2' and pcreg == 'r8':
+        # Thumb-2 (Cortex-M33): PC stays in r8; scaled-index loads and uxth on a high register.
+        # Far targets take an explicit .w: a plain b<c> out of 16-bit range is assembled as a
+        # Thumb-1 veneer (bne over + push/ldr/mov ip/pop/bx ip), a TAKEN branch on every pass.
+        # The last two lines would be one `ldr pc, [r1, r2, lsl #2]`, which the assembler
+        # refuses today (forum 1412); switch when that is fixed.
+        return ['ASM Uses CpuPC',
+                '  lsr r1, r8, #8',
+                '  ldr r2, =global_cpurdmap', '  ldr r1, [r2, r1, lsl #2]',
+                '  cmp r1, #0', '  beq.w __ul_cpurun_slowfetch',
+                '  ldrb r2, [r1, r8]', '  add r8, r8, #1', '  uxth r8, r8',
+                f'  ldr r1, =global_{table}', '  ldr r1, [r1, r2, lsl #2]', '  bx r1',
+                'EndASM']
     if target == 'pico2' and pcreg == 'r4':
         return ['ASM Uses CpuPC',
                 '  lsrs r1, r4, #8', '  lsls r1, r1, #2',
@@ -843,13 +899,21 @@ EndProcedure
     pcreg = 'r8' if 'CpuPC = r8' in REGS else 'r4'
     for c in sorted({c for p in HANDLERS for (_, _, b) in HANDLERS[p].values() for l in b
                      if l.startswith('NextOp') for c in [int(l[6:-2])]} | {2, 4, 6, 18}):
+        if target == 'pico2':      # Thumb-2: subtract straight in the high register
+            dec_t = ['        subs r11, r11, #' + str(c)]
+            dec_u = ['        subs r11, r11, #1']
+            br_t, br_u = 'ble.w', 'beq.w'
+        else:
+            dec_t = ['        mov r0, r11', f'        subs r0, #{c}', '        mov r11, r0']
+            dec_u = ['        mov r0, r11', '        subs r0, #1', '        mov r11, r0']
+            br_t, br_u = 'ble', 'beq'
         emit(f'Macro NextOp{c}()', '  CompilerIf #CPU_TIMING = 1', '    CompilerIf #CPU_ASM_TAIL = 1',
-             '      ASM Uses CpuLeft', '        mov r0, r11', f'        subs r0, #{c}', '        mov r11, r0',
-             '        ble __ul_cpurun_done', '      EndASM', '    CompilerElse',
+             '      ASM Uses CpuLeft', *dec_t,
+             f'        {br_t} __ul_cpurun_done', '      EndASM', '    CompilerElse',
              f'      CpuLeft = CpuLeft - {c}', '      If CpuLeft <= 0', '        Goto Done', '      EndIf',
              '    CompilerEndIf', '  CompilerElse', '    CompilerIf #CPU_ASM_TAIL = 1',
-             '      ASM Uses CpuLeft', '        mov r0, r11', '        subs r0, #1', '        mov r11, r0',
-             '        beq __ul_cpurun_done', '      EndASM', '    CompilerElse', '      CpuLeft = CpuLeft - 1',
+             '      ASM Uses CpuLeft', *dec_u,
+             f'        {br_u} __ul_cpurun_done', '      EndASM', '    CompilerElse', '      CpuLeft = CpuLeft - 1',
              '      If CpuLeft = 0', '        Goto Done', '      EndIf', '    CompilerEndIf', '  CompilerEndIf',
              '  DispatchNext()', 'EndMacro')
     emit('  If n <= 0', '    ProcedureReturn 0', '  EndIf', '  If CpuStopped', '    ProcedureReturn 0', '  EndIf')
@@ -967,7 +1031,19 @@ Illegal3:
         for op in sorted(HANDLERS[page]):
             lab, com, body = HANDLERS[page][op]
             emit(f'{lab}: ; {"$10" if page == 2 else "$11" if page == 3 else ""}${op:02X} {com}')
+            mode = None
             for s in body:
+                if s == '!IFPICO2':
+                    mode = 'p2'
+                    continue
+                if s == '!ELSE':
+                    mode = 'other'
+                    continue
+                if s == '!ENDIF':
+                    mode = None
+                    continue
+                if (mode == 'p2' and target != 'pico2') or (mode == 'other' and target == 'pico2'):
+                    continue
                 if s.startswith('!LABEL '):
                     emit(s[7:] + ':')
                 else:

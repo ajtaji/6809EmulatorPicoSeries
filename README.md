@@ -10,7 +10,7 @@ so no procedure is called per guest instruction.
 (timed, untimed, plain-PureMetal tail) passes 31,000 one-instruction cases
 against a cycle-exact reference, the API/interrupt checks, and W. Schwotzer's
 full MC6809 validation program. Details under **Verification** and **Speed**.
-**Pico 2 W (RP2350), 2026-10-24: the same twelve runs pass on COM6** (150 MHz).
+**Pico 2 W (RP2350), 2026-10-24: the same twelve runs pass on COM6** (150 MHz); 2026-10-25 the Thumb-2 tail passes them again (on COM20) and is up to 45% faster.
 
 **Desktop:** the same core in PureBasic for Windows, with a Neon Arcade
 debugger window and the same test suites, is in [desktop/](desktop/README.md).
@@ -214,9 +214,34 @@ frame is inside one page; ANDCC re-checking interrupts only when it unmasks.
 Reserving a seventh register (the page pointer in r6) made every handler longer
 — the code generator needs r6 as scratch — and was dropped, as with the 6502.
 
-Pico 2 W (RP2350 at its default 150 MHz), same mixes, untimed: 3.23 / 1.76 /
-2.07 / 1.19 M instr/s; timed: 7.90 / 4.58 / 8.69 / 7.41 MHz-equivalent.
-`firmware/6809-pico2w.uf2` is that demo as it ran on COM6.
+### RP2350 (Pico 2 series) at its default 150 MHz: Thumb-2 tail and branches
+
+On the RP2350 the dispatch tail and the 16 short branches are Cortex-M33
+Thumb-2 (2026-10-25, compiler main `9777f6cd6`): PC stays in r8 with scaled
+index loads and `uxth` on the high register, the cycle budget is one
+`subs r11, r11, #n`, the far exits are `beq.w`/`ble.w`, and a branch is the
+flag test plus one signed load through the page table (a PureMetal path takes
+an I/O page). The RP2040 build is unchanged (Thumb-1) and its figures did not
+move with the new compiler.
+
+| Mix | Before (Thumb-1 tail) | After (Thumb-2) | Timed before | Timed after |
+|---|---:|---:|---:|---:|
+| register/branch | 3.23 M/s | **4.69 M/s** (+45%) | 7.90 MHz | **11.55 MHz** |
+| arithmetic | 1.76 M/s | **1.98 M/s** (+13%) | 4.58 MHz | **5.13 MHz** |
+| indexed copy | 2.09 M/s | **2.45 M/s** (+17%) | 8.69 MHz | **10.31 MHz** |
+| call/stack | 1.20 M/s | **1.30 M/s** (+8%) | 7.41 MHz | **8.02 MHz** |
+
+Measured on the Feather RP2350 (COM20) for both columns (the Pico 2 W on COM6
+had stopped answering); the "before" column reproduces the earlier Pico 2 W
+figures to the microsecond. Schwotzer's program: 22.0 ms → 18.6 ms. All twelve
+verification runs pass with the Thumb-2 build
+(`docs/verification-pico2w-thumb2.log`). `firmware/6809-pico2w.uf2` is the
+Thumb-2 demo as it ran there.
+
+The tail would be one instruction shorter as `ldr pc, [r1, r2, lsl #2]`, which
+the assembler refuses today (forum 1412); a plain `beq` beyond 16-bit range was
+assembled as a taken `bne`+`b` or a `push`/`bx ip` veneer rather than `beq.w`
+(forum 1415), hence the explicit `.w`.
 
 Sizes: the demo is 92 KB of flash; 79 KB of the core runs from SRAM (RP2040),
 77.6 KB on the RP2350.

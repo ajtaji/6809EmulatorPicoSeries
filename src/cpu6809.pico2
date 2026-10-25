@@ -300,21 +300,16 @@ ProcedureRAM.i CpuRun(n.i)
 Macro DispatchNext()
   CompilerIf #CPU_ASM_TAIL = 1
     ASM Uses CpuPC
-      mov r0, r8
-      lsrs r1, r0, #8
-      lsls r1, r1, #2
+      lsr r1, r8, #8
       ldr r2, =global_cpurdmap
-      ldr r1, [r2, r1]
+      ldr r1, [r2, r1, lsl #2]
       cmp r1, #0
-      beq __ul_cpurun_slowfetch
-      ldrb r2, [r1, r0]
-      adds r0, #1
-      lsls r0, r0, #16
-      lsrs r0, r0, #16
-      mov r8, r0
-      lsls r2, r2, #2
+      beq.w __ul_cpurun_slowfetch
+      ldrb r2, [r1, r8]
+      add r8, r8, #1
+      uxth r8, r8
       ldr r1, =global_dispatch1
-      ldr r1, [r1, r2]
+      ldr r1, [r1, r2, lsl #2]
       bx r1
     EndASM
   CompilerElse
@@ -327,10 +322,8 @@ Macro NextOp2()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #2
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #2
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 2
@@ -341,10 +334,8 @@ Macro NextOp2()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -359,10 +350,8 @@ Macro NextOp3()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #3
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #3
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 3
@@ -373,10 +362,8 @@ Macro NextOp3()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -391,10 +378,8 @@ Macro NextOp4()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #4
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #4
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 4
@@ -405,10 +390,8 @@ Macro NextOp4()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -423,10 +406,8 @@ Macro NextOp5()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #5
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #5
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 5
@@ -437,10 +418,8 @@ Macro NextOp5()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -455,10 +434,8 @@ Macro NextOp6()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #6
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #6
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 6
@@ -469,10 +446,8 @@ Macro NextOp6()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -487,10 +462,8 @@ Macro NextOp7()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #7
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #7
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 7
@@ -501,10 +474,8 @@ Macro NextOp7()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -519,10 +490,8 @@ Macro NextOp8()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #8
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #8
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 8
@@ -533,10 +502,8 @@ Macro NextOp8()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -551,10 +518,8 @@ Macro NextOp9()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #9
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #9
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 9
@@ -565,10 +530,8 @@ Macro NextOp9()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -583,10 +546,8 @@ Macro NextOp11()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #11
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #11
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 11
@@ -597,10 +558,8 @@ Macro NextOp11()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -615,10 +574,8 @@ Macro NextOp18()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #18
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #18
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 18
@@ -629,10 +586,8 @@ Macro NextOp18()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -647,10 +602,8 @@ Macro NextOp19()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #19
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #19
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 19
@@ -661,10 +614,8 @@ Macro NextOp19()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -679,10 +630,8 @@ Macro NextOp20()
   CompilerIf #CPU_TIMING = 1
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #20
-        mov r11, r0
-        ble __ul_cpurun_done
+        subs r11, r11, #20
+        ble.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 20
@@ -693,10 +642,8 @@ Macro NextOp20()
   CompilerElse
     CompilerIf #CPU_ASM_TAIL = 1
       ASM Uses CpuLeft
-        mov r0, r11
-        subs r0, #1
-        mov r11, r0
-        beq __ul_cpurun_done
+        subs r11, r11, #1
+        beq.w __ul_cpurun_done
       EndASM
     CompilerElse
       CpuLeft = CpuLeft - 1
@@ -2278,123 +2225,521 @@ Op1F: ; $1F TFR imm
   CpuTransfer(CpuPost, 0)
   NextOp6()
 Op20: ; $20 BRA rel8
-  RdSB(CpuVal, CpuPC)
-  CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op20_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op20_next
+    EndASM
+Op20_slow:
+    RdSB(CpuVal, CpuPC)
+    CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Goto Op20_next
+Op20_skip:
+    CpuPC = CpuPC + 1
+Op20_next:
+  CompilerElse
+    RdSB(CpuVal, CpuPC)
+    CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+  CompilerEndIf
   NextOp3()
 Op21: ; $21 BRN rel8
   CpuPC = CpuPC + 1
   NextOp3()
 Op22: ; $22 BHI rel8
-  If (CpuFC & $100) = 0 And CpuFZ <> 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFZ
+      ldr r0, =global_cpufc
+      ldr r0, [r0]
+      and r0, r0, #0x100
+      cmp r5, #0
+      it eq
+      moveq r0, #1
+      cmp r0, #0
+      bne __ul_cpurun_op22_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op22_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op22_next
+    EndASM
+Op22_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op22_next
+Op22_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op22_next:
+  CompilerElse
+    If (CpuFC & $100) = 0 And CpuFZ <> 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op23: ; $23 BLS rel8
-  If (CpuFC & $100) <> 0 Or CpuFZ = 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFZ
+      ldr r0, =global_cpufc
+      ldr r0, [r0]
+      and r0, r0, #0x100
+      cmp r5, #0
+      it eq
+      moveq r0, #1
+      cmp r0, #0
+      beq __ul_cpurun_op23_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op23_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op23_next
+    EndASM
+Op23_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op23_next
+Op23_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op23_next:
+  CompilerElse
+    If (CpuFC & $100) <> 0 Or CpuFZ = 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op24: ; $24 BCC rel8
-  If (CpuFC & $100) = 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC
+      ldr r0, =global_cpufc
+      ldr r0, [r0]
+      tst r0, #0x100
+      bne __ul_cpurun_op24_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op24_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op24_next
+    EndASM
+Op24_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op24_next
+Op24_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op24_next:
+  CompilerElse
+    If (CpuFC & $100) = 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op25: ; $25 BCS rel8
-  If (CpuFC & $100) <> 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC
+      ldr r0, =global_cpufc
+      ldr r0, [r0]
+      tst r0, #0x100
+      beq __ul_cpurun_op25_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op25_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op25_next
+    EndASM
+Op25_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op25_next
+Op25_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op25_next:
+  CompilerElse
+    If (CpuFC & $100) <> 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op26: ; $26 BNE rel8
-  If CpuFZ <> 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFZ
+      cmp r5, #0
+      beq __ul_cpurun_op26_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op26_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op26_next
+    EndASM
+Op26_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op26_next
+Op26_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op26_next:
+  CompilerElse
+    If CpuFZ <> 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op27: ; $27 BEQ rel8
-  If CpuFZ = 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFZ
+      cmp r5, #0
+      bne __ul_cpurun_op27_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op27_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op27_next
+    EndASM
+Op27_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op27_next
+Op27_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op27_next:
+  CompilerElse
+    If CpuFZ = 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op28: ; $28 BVC rel8
-  If (CpuFV & $80) = 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC
+      ldr r0, =global_cpufv
+      ldr r0, [r0]
+      tst r0, #0x80
+      bne __ul_cpurun_op28_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op28_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op28_next
+    EndASM
+Op28_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op28_next
+Op28_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op28_next:
+  CompilerElse
+    If (CpuFV & $80) = 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op29: ; $29 BVS rel8
-  If (CpuFV & $80) <> 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC
+      ldr r0, =global_cpufv
+      ldr r0, [r0]
+      tst r0, #0x80
+      beq __ul_cpurun_op29_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op29_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op29_next
+    EndASM
+Op29_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op29_next
+Op29_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op29_next:
+  CompilerElse
+    If (CpuFV & $80) <> 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op2A: ; $2A BPL rel8
-  If (CpuFN & $80) = 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFN
+      tst r10, #0x80
+      bne __ul_cpurun_op2a_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op2a_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op2a_next
+    EndASM
+Op2A_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op2A_next
+Op2A_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op2A_next:
+  CompilerElse
+    If (CpuFN & $80) = 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op2B: ; $2B BMI rel8
-  If (CpuFN & $80) <> 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFN
+      tst r10, #0x80
+      beq __ul_cpurun_op2b_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op2b_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op2b_next
+    EndASM
+Op2B_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op2B_next
+Op2B_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op2B_next:
+  CompilerElse
+    If (CpuFN & $80) <> 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op2C: ; $2C BGE rel8
-  If ((CpuFN ! CpuFV) & $80) = 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFN
+      ldr r0, =global_cpufv
+      ldr r0, [r0]
+      eor r0, r0, r10
+      tst r0, #0x80
+      bne __ul_cpurun_op2c_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op2c_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op2c_next
+    EndASM
+Op2C_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op2C_next
+Op2C_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op2C_next:
+  CompilerElse
+    If ((CpuFN ! CpuFV) & $80) = 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op2D: ; $2D BLT rel8
-  If ((CpuFN ! CpuFV) & $80) <> 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFN
+      ldr r0, =global_cpufv
+      ldr r0, [r0]
+      eor r0, r0, r10
+      tst r0, #0x80
+      beq __ul_cpurun_op2d_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op2d_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op2d_next
+    EndASM
+Op2D_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op2D_next
+Op2D_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op2D_next:
+  CompilerElse
+    If ((CpuFN ! CpuFV) & $80) <> 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op2E: ; $2E BGT rel8
-  If ((CpuFN ! CpuFV) & $80) = 0 And CpuFZ <> 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFZ, CpuFN
+      ldr r0, =global_cpufv
+      ldr r0, [r0]
+      eor r0, r0, r10
+      and r0, r0, #0x80
+      cmp r5, #0
+      it eq
+      moveq r0, #1
+      cmp r0, #0
+      bne __ul_cpurun_op2e_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op2e_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op2e_next
+    EndASM
+Op2E_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op2E_next
+Op2E_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op2E_next:
+  CompilerElse
+    If ((CpuFN ! CpuFV) & $80) = 0 And CpuFZ <> 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op2F: ; $2F BLE rel8
-  If ((CpuFN ! CpuFV) & $80) <> 0 Or CpuFZ = 0
+  CompilerIf #CPU_ASM_TAIL = 1
+    ASM Uses CpuPC, CpuFZ, CpuFN
+      ldr r0, =global_cpufv
+      ldr r0, [r0]
+      eor r0, r0, r10
+      and r0, r0, #0x80
+      cmp r5, #0
+      it eq
+      moveq r0, #1
+      cmp r0, #0
+      beq __ul_cpurun_op2f_skip
+      lsr r1, r8, #8
+      ldr r2, =global_cpurdmap
+      ldr r1, [r2, r1, lsl #2]
+      cmp r1, #0
+      beq __ul_cpurun_op2f_slow
+      ldrsb r2, [r1, r8]
+      add r8, r8, #1
+      add r8, r8, r2
+      uxth r8, r8
+      b __ul_cpurun_op2f_next
+    EndASM
+Op2F_slow:
     RdSB(CpuVal, CpuPC)
     CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
-  Else
+    Goto Op2F_next
+Op2F_skip:
     CpuPC = CpuPC + 1
-  EndIf
+Op2F_next:
+  CompilerElse
+    If ((CpuFN ! CpuFV) & $80) <> 0 Or CpuFZ = 0
+      RdSB(CpuVal, CpuPC)
+      CpuPC = (CpuPC + 1 + CpuVal) & $FFFF
+    Else
+      CpuPC = CpuPC + 1
+    EndIf
+  CompilerEndIf
   NextOp3()
 Op30: ; $30 LEAX idx
   RdB(CpuPost, CpuPC)
