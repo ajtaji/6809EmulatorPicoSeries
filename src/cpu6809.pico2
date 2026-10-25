@@ -309,8 +309,7 @@ Macro DispatchNext()
       add r8, r8, #1
       uxth r8, r8
       ldr r1, =global_dispatch1
-      ldr r1, [r1, r2, lsl #2]
-      bx r1
+      ldr pc, [r1, r2, lsl #2]
     EndASM
   CompilerElse
     RdB(CpuTmp, CpuPC)

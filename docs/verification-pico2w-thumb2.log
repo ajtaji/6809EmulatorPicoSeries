@@ -1,78 +1,102 @@
-6809 core, RP2350 with the Thumb-2 dispatch tail and Thumb-2 short branches (compiler main 9777f6cd6), 2026-10-25.
-Board: Adafruit Feather RP2350 HSTX on COM20 at 150 MHz (COM6, the Pico 2 W, had stopped answering).
-base-*: the committed sources before the change (Thumb-1 tail), same board, same compiler.
+6809 core, RP2350: dispatch tail ending in ldr pc, [r1, r2, lsl #2] (compiler main 883c4ae12), 2026-10-25.
+Board: Feather RP2350 (COM20, 150 MHz). base-*: commit d9f5978 (ldr + bx) built with the same compiler.
 
 [base-fast-b.pico2w] API/interrupt/bus checks failures=0 PASS
-[base-fast-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=21491
-[base-fast-b.pico2w] arithmetic instructions=1000000 us=569525 instructions/s=1755849
-[base-fast-b.pico2w] arithmetic instructions=1000000 us=569526 instructions/s=1755846
-[base-fast-b.pico2w] call/stack instructions=1000000 us=833334 instructions/s=1199999
-[base-fast-b.pico2w] call/stack instructions=1000000 us=833335 instructions/s=1199997
-[base-fast-b.pico2w] indexed-copy instructions=1000000 us=478471 instructions/s=2089990
-[base-fast-b.pico2w] register/branch instructions=1000000 us=309761 instructions/s=3228295
-[base-fast-b.pico2w] register/branch instructions=1000000 us=309767 instructions/s=3228232
+[base-fast-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=18484
+[base-fast-b.pico2w] arithmetic instructions=1000000 us=505715 instructions/s=1977398
+[base-fast-b.pico2w] arithmetic instructions=1000000 us=505717 instructions/s=1977390
+[base-fast-b.pico2w] call/stack instructions=1000000 us=770477 instructions/s=1297897
+[base-fast-b.pico2w] indexed-copy instructions=1000000 us=411908 instructions/s=2427726
+[base-fast-b.pico2w] indexed-copy instructions=1000000 us=411909 instructions/s=2427720
+[base-fast-b.pico2w] register/branch instructions=1000000 us=226551 instructions/s=4414017
+[base-fast-b.pico2w] register/branch instructions=1000000 us=226556 instructions/s=4413919
 [base-fast-b.pico2w] vectors first=0 cases=9000 failures=0 PASS
 [base-timed-b.pico2w] API/interrupt/bus checks failures=0 PASS
-[base-timed-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=22007
-[base-timed-b.pico2w] arithmetic cycles=1000002 us=218520 emulated kHz=4576
-[base-timed-b.pico2w] call/stack cycles=1000004 us=135002 emulated kHz=7407
-[base-timed-b.pico2w] indexed-copy cycles=1000000 us=115061 emulated kHz=8691
-[base-timed-b.pico2w] indexed-copy cycles=1000000 us=115062 emulated kHz=8690
-[base-timed-b.pico2w] register/branch cycles=1000002 us=126518 emulated kHz=7904
-[base-timed-b.pico2w] register/branch cycles=1000002 us=126522 emulated kHz=7903
+[base-timed-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=18985
+[base-timed-b.pico2w] arithmetic cycles=1000002 us=197779 emulated kHz=5056
+[base-timed-b.pico2w] call/stack cycles=1000004 us=124092 emulated kHz=8058
+[base-timed-b.pico2w] call/stack cycles=1000004 us=124093 emulated kHz=8058
+[base-timed-b.pico2w] indexed-copy cycles=1000000 us=96235 emulated kHz=10391
+[base-timed-b.pico2w] indexed-copy cycles=1000000 us=96236 emulated kHz=10391
+[base-timed-b.pico2w] register/branch cycles=1000002 us=85245 emulated kHz=11730
+[base-timed-b.pico2w] register/branch cycles=1000002 us=85248 emulated kHz=11730
 [base-timed-b.pico2w] vectors first=0 cases=9000 failures=0 PASS
 [verify-fast-b.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-fast-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=18397
-[verify-fast-b.pico2w] arithmetic instructions=1000000 us=503810 instructions/s=1984875
-[verify-fast-b.pico2w] arithmetic instructions=1000000 us=503811 instructions/s=1984871
-[verify-fast-b.pico2w] call/stack instructions=1000000 us=771429 instructions/s=1296295
-[verify-fast-b.pico2w] call/stack instructions=1000000 us=771430 instructions/s=1296293
-[verify-fast-b.pico2w] indexed-copy instructions=1000000 us=408549 instructions/s=2447686
-[verify-fast-b.pico2w] register/branch instructions=1000000 us=213205 instructions/s=4690321
+[verify-fast-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=18619
+[verify-fast-b.pico2w] arithmetic instructions=1000000 us=504763 instructions/s=1981127
+[verify-fast-b.pico2w] arithmetic instructions=1000000 us=504766 instructions/s=1981116
+[verify-fast-b.pico2w] call/stack instructions=1000000 us=776191 instructions/s=1288342
+[verify-fast-b.pico2w] call/stack instructions=1000000 us=776192 instructions/s=1288341
+[verify-fast-b.pico2w] indexed-copy instructions=1000000 us=406901 instructions/s=2457600
+[verify-fast-b.pico2w] indexed-copy instructions=1000000 us=406903 instructions/s=2457588
+[verify-fast-b.pico2w] register/branch instructions=1000000 us=213204 instructions/s=4690343
 [verify-fast-b.pico2w] register/branch instructions=1000000 us=213210 instructions/s=4690211
 [verify-fast-b.pico2w] vectors first=0 cases=9000 failures=0 PASS
 [verify-fast-c.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-fast-c.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=18400
+[verify-fast-c.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=18616
 [verify-fast-c.pico2w] vectors first=9000 cases=9000 failures=0 PASS
 [verify-fast-d.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-fast-d.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=18399
+[verify-fast-d.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=18618
 [verify-fast-d.pico2w] vectors first=18000 cases=9000 failures=0 PASS
 [verify-fast-i.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-fast-i.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=18378
+[verify-fast-i.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=18578
 [verify-fast-i.pico2w] vectors first=0 cases=4000 failures=0 PASS
 [verify-pure-b.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-pure-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23501
-[verify-pure-b.pico2w] arithmetic cycles=1000002 us=235927 emulated kHz=4238
-[verify-pure-b.pico2w] call/stack cycles=1000004 us=140153 emulated kHz=7135
-[verify-pure-b.pico2w] call/stack cycles=1000004 us=140154 emulated kHz=7135
-[verify-pure-b.pico2w] indexed-copy cycles=1000000 us=123794 emulated kHz=8077
-[verify-pure-b.pico2w] indexed-copy cycles=1000000 us=123795 emulated kHz=8077
-[verify-pure-b.pico2w] register/branch cycles=1000002 us=139851 emulated kHz=7150
-[verify-pure-b.pico2w] register/branch cycles=1000002 us=139855 emulated kHz=7150
+[verify-pure-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23229
+[verify-pure-b.pico2w] arithmetic cycles=1000002 us=232223 emulated kHz=4306
+[verify-pure-b.pico2w] arithmetic cycles=1000002 us=232224 emulated kHz=4306
+[verify-pure-b.pico2w] call/stack cycles=1000004 us=139395 emulated kHz=7173
+[verify-pure-b.pico2w] call/stack cycles=1000004 us=139396 emulated kHz=7173
+[verify-pure-b.pico2w] indexed-copy cycles=1000000 us=122123 emulated kHz=8188
+[verify-pure-b.pico2w] indexed-copy cycles=1000000 us=122124 emulated kHz=8188
+[verify-pure-b.pico2w] register/branch cycles=1000002 us=138516 emulated kHz=7219
+[verify-pure-b.pico2w] register/branch cycles=1000002 us=138519 emulated kHz=7219
 [verify-pure-b.pico2w] vectors first=0 cases=9000 failures=0 PASS
 [verify-pure-c.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-pure-c.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23498
+[verify-pure-c.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23229
 [verify-pure-c.pico2w] vectors first=9000 cases=9000 failures=0 PASS
 [verify-pure-d.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-pure-d.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23565
+[verify-pure-d.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23225
 [verify-pure-d.pico2w] vectors first=18000 cases=9000 failures=0 PASS
 [verify-pure-i.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-pure-i.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23519
+[verify-pure-i.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=23196
 [verify-pure-i.pico2w] vectors first=0 cases=4000 failures=0 PASS
 [verify-timed-b.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-timed-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=18625
-[verify-timed-b.pico2w] arithmetic cycles=1000002 us=194816 emulated kHz=5133
-[verify-timed-b.pico2w] call/stack cycles=1000004 us=124699 emulated kHz=8019
-[verify-timed-b.pico2w] indexed-copy cycles=1000000 us=97024 emulated kHz=10306
-[verify-timed-b.pico2w] register/branch cycles=1000002 us=86585 emulated kHz=11549
-[verify-timed-b.pico2w] register/branch cycles=1000002 us=86589 emulated kHz=11548
+[verify-timed-b.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=18795
+[verify-timed-b.pico2w] arithmetic cycles=1000002 us=197038 emulated kHz=5075
+[verify-timed-b.pico2w] call/stack cycles=1000004 us=124092 emulated kHz=8058
+[verify-timed-b.pico2w] indexed-copy cycles=1000000 us=96237 emulated kHz=10391
+[verify-timed-b.pico2w] indexed-copy cycles=1000000 us=96238 emulated kHz=10390
+[verify-timed-b.pico2w] register/branch cycles=1000002 us=86580 emulated kHz=11550
+[verify-timed-b.pico2w] register/branch cycles=1000002 us=86584 emulated kHz=11549
 [verify-timed-b.pico2w] vectors first=0 cases=9000 failures=0 PASS
 [verify-timed-c.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-timed-c.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=18622
+[verify-timed-c.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=18802
 [verify-timed-c.pico2w] vectors first=9000 cases=9000 failures=0 PASS
 [verify-timed-d.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-timed-d.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=18622
+[verify-timed-d.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=18789
 [verify-timed-d.pico2w] vectors first=18000 cases=9000 failures=0 PASS
 [verify-timed-i.pico2w] API/interrupt/bus checks failures=0 PASS
-[verify-timed-i.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=18635
+[verify-timed-i.pico2w] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=18792
 [verify-timed-i.pico2w] vectors first=0 cases=4000 failures=0 PASS
+
+RP2040 regression check, same compiler, COM7:
+[verify-fast-b.picow] API/interrupt/bus checks failures=0 PASS
+[verify-fast-b.picow] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=40000 us=20004
+[verify-fast-b.picow] arithmetic instructions=1000000 us=517144 instructions/s=1933697
+[verify-fast-b.picow] arithmetic instructions=1000000 us=517145 instructions/s=1933693
+[verify-fast-b.picow] call/stack instructions=1000000 us=774286 instructions/s=1291512
+[verify-fast-b.picow] call/stack instructions=1000000 us=774287 instructions/s=1291510
+[verify-fast-b.picow] indexed-copy instructions=1000000 us=437209 instructions/s=2287235
+[verify-fast-b.picow] indexed-copy instructions=1000000 us=437210 instructions/s=2287230
+[verify-fast-b.picow] register/branch instructions=1000000 us=272262 instructions/s=3672932
+[verify-fast-b.picow] register/branch instructions=1000000 us=272265 instructions/s=3672892
+[verify-fast-b.picow] vectors first=0 cases=9000 failures=0 PASS
+[verify-timed-b.picow] API/interrupt/bus checks failures=0 PASS
+[verify-timed-b.picow] Schwotzer validation PASS PC=32768 stopped=0 op=0 budget used=180050 us=20306
+[verify-timed-b.picow] arithmetic cycles=1000002 us=200557 emulated kHz=4986
+[verify-timed-b.picow] call/stack cycles=1000004 us=125002 emulated kHz=7999
+[verify-timed-b.picow] indexed-copy cycles=1000000 us=105340 emulated kHz=9493
+[verify-timed-b.picow] register/branch cycles=1000002 us=108864 emulated kHz=9185
+[verify-timed-b.picow] register/branch cycles=1000002 us=108866 emulated kHz=9185
+[verify-timed-b.picow] vectors first=0 cases=9000 failures=0 PASS

@@ -238,10 +238,16 @@ verification runs pass with the Thumb-2 build
 (`docs/verification-pico2w-thumb2.log`). `firmware/6809-pico2w.uf2` is the
 Thumb-2 demo as it ran there.
 
-The tail would be one instruction shorter as `ldr pc, [r1, r2, lsl #2]`, which
-the assembler refuses today (forum 1412); a plain `beq` beyond 16-bit range was
-assembled as a taken `bne`+`b` or a `push`/`bx ip` veneer rather than `beq.w`
-(forum 1415), hence the explicit `.w`.
+Since compiler `883c4ae12` (forum 1412/1416 fixed) the dispatch ends in one
+`ldr pc, [r1, r2, lsl #2]` instead of `ldr` + `bx`. Same board, same compiler,
+before → after: untimed 4.41 / 1.98 / 2.43 / 1.30 → **4.69 / 1.98 / 2.46 /
+1.29** M instr/s; timed 11.73 / 5.06 / 10.39 / 8.06 → 11.55 / 5.08 / 10.39 /
+8.06 MHz-equivalent; Schwotzer's program 18.99 → 18.80 ms. The unchanged
+`ldr`+`bx` core measured 4.69 under the previous compiler and 4.41 under this
+one, so code placement alone moves these mixes by about 6%: the change is one
+instruction shorter and faster on the real program, and within placement noise
+on the micro-mixes. All twelve runs pass again. The far exits keep their
+explicit `.w` (forum 1415, now also fixed in the assembler).
 
 Sizes: the demo is 92 KB of flash; 79 KB of the core runs from SRAM (RP2040),
 77.6 KB on the RP2350.

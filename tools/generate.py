@@ -561,14 +561,14 @@ def asm_fetch_tail(table, target):
         # Thumb-2 (Cortex-M33): PC stays in r8; scaled-index loads and uxth on a high register.
         # Far targets take an explicit .w: a plain b<c> out of 16-bit range is assembled as a
         # Thumb-1 veneer (bne over + push/ldr/mov ip/pop/bx ip), a TAKEN branch on every pass.
-        # The last two lines would be one `ldr pc, [r1, r2, lsl #2]`, which the assembler
-        # refuses today (forum 1412); switch when that is fixed.
+        # The dispatch is one load into pc (forum 1412/1416 fixed in 883c4ae12); the table
+        # entries carry the Thumb bit.
         return ['ASM Uses CpuPC',
                 '  lsr r1, r8, #8',
                 '  ldr r2, =global_cpurdmap', '  ldr r1, [r2, r1, lsl #2]',
                 '  cmp r1, #0', '  beq.w __ul_cpurun_slowfetch',
                 '  ldrb r2, [r1, r8]', '  add r8, r8, #1', '  uxth r8, r8',
-                f'  ldr r1, =global_{table}', '  ldr r1, [r1, r2, lsl #2]', '  bx r1',
+                f'  ldr r1, =global_{table}', '  ldr pc, [r1, r2, lsl #2]',
                 'EndASM']
     if target == 'pico2' and pcreg == 'r4':
         return ['ASM Uses CpuPC',
