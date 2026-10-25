@@ -211,8 +211,42 @@ same suites, a disassembler, and a debugger window drawn with the
 registers and flags, disassembly with breakpoints, memory, the program's
 output, run / step / pause, and a Tests tab.
 
+### Building the desktop version
+
+Built with PureBasic 6.41 (x64, C back end). Clone this repository and the
+[engine](https://github.com/ajtaji/Neon-Arcade-Dispay-Engine) side by side, in
+the same parent folder:
+
+```bash
+git clone https://github.com/ajtaji/6809EmulatorPicoSeries.git
+```
+
+```bash
+git clone https://github.com/ajtaji/Neon-Arcade-Dispay-Engine.git
+```
+
+Then, from the `6809EmulatorPicoSeries` folder, in PowerShell:
+
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\build_desktop.ps1 -Engine C:/path/to/Neon-Arcade-Dispay-Engine/
+powershell -ExecutionPolicy Bypass -File tools\build_desktop.ps1
+```
+
+This builds the console verifier in both timing modes, runs every suite, and builds
+the window into `desktop\bin\m6809.exe`. The script finds the engine beside the
+repository on its own. To use another engine folder, pass `-Engine <folder>` or set
+`NEON_ENGINE_DIR`. If the compiler is not at
+`C:\Program Files\PureBasic\Compilers\pbcompilerc.exe`, pass `-Pb <path>` or set
+`PBCOMPILERC`.
+
+The window alone, without the script:
+
+```powershell
+pbcompilerc desktop\m6809.pb /OPTIMIZER /THREAD /DPIAWARE /OUTPUT desktop\bin\m6809.exe
+```
+
+Run it from the repository folder:
+
+```powershell
 desktop\bin\m6809.exe [program.s19] [tests] [run]
 ```
 
