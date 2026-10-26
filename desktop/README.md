@@ -22,9 +22,19 @@ Build and test everything (PowerShell):
 powershell -ExecutionPolicy Bypass -File tools\build_desktop.ps1
 ```
 
-Run: `desktop\bin\m6809.exe [program.s19] [tests] [run] [shot:<file.png>]`
+Run: `desktop\bin\m6809.exe [program.s19] [tests] [run] [shot:<file.png>] [--pointer-test <log>]`
 from the repository folder. `shot:` draws a few frames, saves the window as a
 PNG and exits; `docs/desktop-*.png` were taken that way.
+
+`--pointer-test <log>` checks that the pointer and the controls agree at the
+display's scale, without moving the real pointer: the window is driven with
+synthetic pointer positions. Each of 12 controls gets four points, just inside its
+top-left and bottom-right corners (a press must land) and just right of and below
+it (a press must not). The controls include the buttons and tabs at the top and
+the last disassembly and log rows at the bottom. The exit code is the number of
+failures. At 125%: 48 of 48 points pass, and every point reads back within 0.5 px.
+With the engine's CRT pointer warp left on (`UI_UseCRT`, which this program
+switches off because it does not draw through the CRT pass), 31 fail.
 
 ## Dispatch: which is fastest on the PC (measured)
 

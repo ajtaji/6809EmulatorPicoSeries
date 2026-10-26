@@ -4,7 +4,7 @@
 ; from the same tools/generate.py as the Pico core; the test suites are the
 ; ones the Pico W runs (desktop/testsuite.pbi).
 ;
-;   m6809.exe [program.s19] [tests] [run] [shot:<file.png>]
+;   m6809.exe [program.s19] [tests] [run] [shot:<file.png>] [--pointer-test <log>]
 ;
 ; Loads an S-record (asm6809 -S) program - W. Schwotzer's validation program
 ; by default - with RAM everywhere and page $FF as I/O: a byte written to
@@ -14,6 +14,10 @@
 ;
 ; "tests" runs the suites at start, "run" starts the program; "shot:<file>" draws a few frames, saves
 ; the window as a PNG and exits (how the window is checked without a person).
+;
+; "--pointer-test <log>" checks that the pointer and the controls agree at the display's scale without
+; touching the real pointer: the chrome is driven with synthetic positions (see the end of this file's
+; drawing section) and the result written to <log>; the exit code is the number of failures.
 ;
 ; Build (PowerShell; tools/build_desktop.ps1 does this):
 ;   pbcompilerc.exe desktop\m6809.pb /OPTIMIZER /THREAD /DPIAWARE /EXE desktop\build\m6809.exe
@@ -47,6 +51,23 @@ Global TraceT0.q, TraceFile.i
 Global Shot$, ShotFrames.i, RunTestsAtStart.i, RunAtStart.i
 Global *FontBig.GLFont
 Global DisStart.i
+Global PtOn.i, PtClicked$   ; --pointer-test: on, and the control a synthetic press landed on
+
+; Where each control was last drawn, in canvas units (physical pixels), for --pointer-test.
+Structure CtlRect : x.f : y.f : w.f : h.f : EndStructure
+Global NewMap Ctl.CtlRect()
+Procedure CtlSet(name$, x.f, y.f, w.f, h.f)
+  Ctl(name$)\x = x : Ctl()\y = y : Ctl()\w = w : Ctl()\h = h
+EndProcedure
+; Neon_Button remembering where it was drawn; under --pointer-test a press is recorded, not acted on.
+Procedure.b Btn(name$, x.f, y.f, w.f, h.f, label.s, lit.b = #False)
+  CtlSet(name$, x, y, w, h)
+  If Neon_Button(x, y, w, h, label, lit)
+    If PtOn : PtClicked$ = name$ : ProcedureReturn #False : EndIf
+    ProcedureReturn #True
+  EndIf
+  ProcedureReturn #False
+EndProcedure
 
 Procedure Trace(what$)
   If TraceFile : WriteStringN(TraceFile, Str(ElapsedMilliseconds() - TraceT0) + " ms " + what$) : EndIf
@@ -209,8 +230,15 @@ Procedure DrawDisassembly(x.f, y.f, w.f, h.f)
   yy = y + Neon_S(32)
   For k = 1 To rows
     line$ = CpuDisasm(a)
+    If k = 2 : CtlSet("disassembly row 2", x, yy, w, rowH) : EndIf
+    If k = rows : CtlSet("disassembly last row", x, yy, w, rowH) : EndIf
     If Neon_Hit(x, yy, w, rowH) And Neon_MouseClicked
-      Breakpoint(a) = Breakpoint(a) ! 1
+      If PtOn
+        PtClicked$ = "disassembly row " + Str(k)
+        If k = rows : PtClicked$ = "disassembly last row" : EndIf
+      Else
+        Breakpoint(a) = Breakpoint(a) ! 1
+      EndIf
     EndIf
     r = Neon_C_TextR : g = Neon_C_TextG : b = Neon_C_TextB
     If a = CpuPC
@@ -231,6 +259,7 @@ Procedure DrawMemory(x.f, y.f, w.f, h.f)
   Neon_Panel(x, y, w, h, "Memory", Neon_C_AccR, Neon_C_AccG, Neon_C_AccB, Neon_S(26))
   Neon_Text(*Neon_FontSmall, x + Neon_S(12), y + Neon_S(36), "go to $", Neon_C_FaintR, Neon_C_FaintG, Neon_C_FaintB)
   Protected s.String : s\s = MemAddr$
+  CtlSet("address field", x + Neon_S(70), y + Neon_S(32), Neon_S(90), Neon_S(24))
   If Neon_TextInput(501, x + Neon_S(70), y + Neon_S(32), Neon_S(90), Neon_S(24), @s, "address", @MemCaret)
     MemAddr$ = s\s
     MemTop = (Val("$" + MemAddr$) & $FFF0) >> 4
@@ -275,7 +304,7 @@ EndProcedure
 Procedure DrawTests(x.f, y.f, w.f, h.f)
   Protected verdict$ = "not run yet", r.f = Neon_C_FaintR, g.f = Neon_C_FaintG, b.f = Neon_C_FaintB
   Neon_Panel(x, y, w, h, "Test suites  (the same ones the Pico W runs)", Neon_C_AccR, Neon_C_AccG, Neon_C_AccB, Neon_S(26))
-  If Neon_Button(x + Neon_S(12), y + Neon_S(36), Neon_S(150), Neon_S(30), "Run all suites", #True)
+  If Btn("Run all suites", x + Neon_S(12), y + Neon_S(36), Neon_S(150), Neon_S(30), "Run all suites", #True)
     RunTests()
   EndIf
   If TestsRan
@@ -287,11 +316,20 @@ Procedure DrawTests(x.f, y.f, w.f, h.f)
   EndIf
   Neon_Text(*FontBig, x + Neon_S(180), y + Neon_S(38), verdict$, r, g, b)
   Neon_ListBegin(601, x + Neon_S(12), y + Neon_S(80), w - Neon_S(24), h - Neon_S(92), Neon_S(22), @LogTop)
+  Protected idx.i, rowY.f, last.i = Neon_ListTop + Int(Neon_ListH / Neon_ListRowH) - 1, hit.b
   ForEach LogLines()
+    idx = Neon_ListRow : rowY = Neon_ListY + (idx - Neon_ListTop) * Neon_ListRowH
+    If idx = Neon_ListTop : CtlSet("log first row", Neon_ListX, rowY, Neon_ListW - Neon_S(10), Neon_ListRowH) : EndIf
+    If idx = last : CtlSet("log last row", Neon_ListX, rowY, Neon_ListW - Neon_S(10), Neon_ListRowH) : EndIf
     If FindString(LogLines(), "FAIL")
-      Neon_ListItem(LogLines(), 0, #True)
+      hit = Neon_ListItem(LogLines(), 0, #True)
     Else
-      Neon_ListItem(LogLines())
+      hit = Neon_ListItem(LogLines())
+    EndIf
+    If hit And PtOn
+      PtClicked$ = "log row " + Str(idx)
+      If idx = Neon_ListTop : PtClicked$ = "log first row" : EndIf
+      If idx = last : PtClicked$ = "log last row" : EndIf
     EndIf
   Next
   Neon_ListEnd()
@@ -301,20 +339,20 @@ Procedure DrawFrame(pw.i, ph.i)
   Protected top.f = Neon_S(8), bh.f = Neon_S(30), bx.f = Neon_S(12), gap.f = Neon_S(8), file$
   Neon_Text(*FontBig, bx, top + Neon_S(2), "MC6809", Neon_C_AccR, Neon_C_AccG, Neon_C_AccB)
   bx + Neon_S(110)
-  If Neon_Button(bx, top, Neon_S(90), bh, "Load S19") And Shot$ = ""
+  If Btn("Load S19", bx, top, Neon_S(90), bh, "Load S19") And Shot$ = ""
     file$ = OpenFileRequester("Load a 6809 program (S-record)", TestRoot$ + "Diagnostics\", "S-record|*.s19;*.srec;*.s28|All|*.*", 0)
     If file$ : LoadProgram(file$) : ResetCpu() : EndIf
   EndIf
   bx + Neon_S(90) + gap
-  If Neon_Button(bx, top, Neon_S(80), bh, "Reset") : ResetCpu() : EndIf
+  If Btn("Reset", bx, top, Neon_S(80), bh, "Reset") : ResetCpu() : EndIf
   bx + Neon_S(80) + gap
   If Running
-    If Neon_Button(bx, top, Neon_S(80), bh, "Pause", #True) : Running = 0 : Speed$ = "paused" : EndIf
+    If Btn("Run", bx, top, Neon_S(80), bh, "Pause", #True) : Running = 0 : Speed$ = "paused" : EndIf
   Else
-    If Neon_Button(bx, top, Neon_S(80), bh, "Run") : Running = 1 : SpeedT0 = ElapsedMilliseconds() : SpeedCycles = 0 : EndIf
+    If Btn("Run", bx, top, Neon_S(80), bh, "Run") : Running = 1 : SpeedT0 = ElapsedMilliseconds() : SpeedCycles = 0 : EndIf
   EndIf
   bx + Neon_S(80) + gap
-  If Neon_Button(bx, top, Neon_S(80), bh, "Step") : StepReq = 1 : EndIf
+  If Btn("Step", bx, top, Neon_S(80), bh, "Step") : StepReq = 1 : EndIf
   bx + Neon_S(80) + gap * 3
   Neon_Text(*Neon_FontSmall, bx, top + Neon_S(7), "F5 run/pause   F10 step   " + GetFilePart(ProgramFile$), Neon_C_FaintR, Neon_C_FaintG, Neon_C_FaintB)
   Protected ty.f = top + bh + Neon_S(10)
@@ -332,16 +370,120 @@ Procedure DrawFrame(pw.i, ph.i)
 EndProcedure
 
 ; ------------------------------------------------------------ the window
-Procedure.f DisplayScale(win.i)
-  Protected lib.i, *fn, dpi.i
-  lib = OpenLibrary(#PB_Any, "user32.dll")
-  If lib
-    *fn = GetFunction(lib, "GetDpiForWindow")
-    If *fn : dpi = CallFunctionFast(*fn, WindowID(win)) : EndIf
-    CloseLibrary(lib)
+; The display scale s = physical / logical client width (the engine's GlUIChrome.pbi section 5a):
+; Neon_UIScale = s and the fonts at logical size * s. Measured every frame, so the fonts are rebuilt
+; when the window reaches a monitor with another scale.
+Procedure ScaleFonts(s.f)
+  If s <= 0 : s = 1.0 : EndIf
+  If *FontBig And Abs(s - Neon_UIScale) < 0.005 : ProcedureReturn : EndIf
+  Neon_UIScale = s
+  If *FontBig
+    FreeGLFont(*Neon_FontUI) : FreeGLFont(*Neon_FontSmall) : FreeGLFont(*Neon_FontBold) : FreeGLFont(*Neon_FontMono) : FreeGLFont(*FontBig)
   EndIf
-  If dpi <= 0 : ProcedureReturn 1.0 : EndIf
-  ProcedureReturn dpi / 96.0
+  *Neon_FontUI    = Neon_CreateFontPx("Segoe UI", Round(14 * s, #PB_Round_Nearest))
+  *Neon_FontSmall = Neon_CreateFontPx("Segoe UI", Round(12 * s, #PB_Round_Nearest))
+  *Neon_FontBold  = Neon_CreateFontPx("Segoe UI", Round(15 * s, #PB_Round_Nearest), #PB_Font_Bold)
+  *Neon_FontMono  = Neon_CreateFontPx("Consolas", Round(14 * s, #PB_Round_Nearest))
+  *FontBig        = Neon_CreateFontPx("Segoe UI", Round(20 * s, #PB_Round_Nearest), #PB_Font_Bold)
+  GLFontSetSnapToPixel(*Neon_FontUI, #True) : GLFontSetSnapToPixel(*Neon_FontSmall, #True)
+  GLFontSetSnapToPixel(*Neon_FontBold, #True) : GLFontSetSnapToPixel(*Neon_FontMono, #True)
+  GLFontSetSnapToPixel(*FontBig, #True)
+EndProcedure
+
+; ---------------------------------------------------------------- --pointer-test
+; The real pointer is shared with everyone on this desktop, so it is never moved: the chrome is driven
+; with synthetic positions in the units WindowMouseX/Y give a DPI-aware window (physical pixels). For
+; every control four points: just inside its top-left and its bottom-right corner (a press must land on
+; it), just right of it and just below it (a press must not). Every frame Neon_MX/Neon_MY must read the
+; point back unbent. Controls at the top (buttons, tabs) and at the bottom of the window (the last
+; disassembly row, the last log row) are both covered.
+Global PtLog$, PtFile$, PtX.f, PtY.f, PtDown.i, PtCase.i, PtPoint.i, PtFrame.i, PtFails.i, PtPoints.i, PtWorst.f, PtDone.i
+Global PtCount.i, Dim PtName$(20)
+
+Procedure PtInit()
+  Protected n$ = "Load S19|Reset|Run|Step|tab 0|tab 1|address field|disassembly row 2|disassembly last row|Run all suites|log first row|log last row"
+  Protected i.i
+  PtCount = CountString(n$, "|") + 1
+  For i = 0 To PtCount - 1 : PtName$(i) = StringField(n$, i + 1, "|") : Next
+  For i = 1 To 400 : Report("log line " + Str(i)) : Next   ; a list longer than its pane
+EndProcedure
+
+Procedure.i PtRect(name$, *r.CtlRect)
+  Protected *row.Neon_TabRowLayout, i.i
+  If Left(name$, 4) = "tab "
+    If FindMapElement(Neon_TabLayout(), "700") = 0 : ProcedureReturn 0 : EndIf
+    *row = @Neon_TabLayout() : i = Val(Mid(name$, 5))
+    If i >= *row\Count : ProcedureReturn 0 : EndIf
+    ; the row's last pixel is the strip's underline, not a tab
+    *r\x = *row\X(i) : *r\w = *row\W(i) : *r\y = *row\Y : *r\h = *row\H - 1
+    ProcedureReturn 1
+  EndIf
+  If FindMapElement(Ctl(), name$) = 0 : ProcedureReturn 0 : EndIf
+  CopyStructure(@Ctl(), *r, CtlRect)
+  ProcedureReturn 1
+EndProcedure
+
+; One step, after each frame is drawn.
+Procedure PtStep()
+  Protected r.CtlRect, name$, inside.i, got$, ok.i, f.i
+  If PtCase >= PtCount
+    PtLog$ + "pointer-test: " + Str(PtPoints) + " points on " + Str(PtCount) + " controls, " + Str(PtFails) + " failures, scale " +
+             StrF(Neon_UIScale, 2) + ", canvas " + Str(Util_BaseWidth) + "x" + Str(Util_BaseHeight) + " physical, window " +
+             Str(Util_WinWidth) + "x" + Str(Util_WinHeight) + " logical, UI_UseCRT " + Str(UI_UseCRT) +
+             ", worst pointer read-back error " + StrF(PtWorst, 2) + " px" + #LF$
+    f = CreateFile(#PB_Any, PtFile$)
+    If f : WriteString(f, PtLog$) : CloseFile(f) : EndIf
+    PtDone = 1
+    ProcedureReturn
+  EndIf
+  name$ = PtName$(PtCase)
+  If PtFrame > 1
+    If Abs(Neon_MX - PtX) > PtWorst : PtWorst = Abs(Neon_MX - PtX) : EndIf
+    If Abs(Neon_MY - PtY) > PtWorst : PtWorst = Abs(Neon_MY - PtY) : EndIf
+  EndIf
+  PtFrame + 1
+  Select PtFrame
+    Case 1                                       ; the page that shows the control, the pointer away
+      If name$ = "Run all suites" Or Left(name$, 4) = "log " : Tab = 1 : Else : Tab = 0 : EndIf
+      PtX = 1 : PtY = 1 : PtDown = 0
+    Case 2                                       ; drawn: go to the point
+      If PtRect(name$, @r) = 0
+        PtLog$ + "FAIL " + name$ + ": not drawn" + #LF$ : PtFails + 1
+        PtFrame = 0 : PtPoint = 0 : PtCase + 1 : ProcedureReturn
+      EndIf
+      Select PtPoint
+        Case 0 : PtX = r\x + 2 : PtY = r\y + 2
+        Case 1 : PtX = r\x + r\w - 2 : PtY = r\y + r\h - 2
+        Case 2 : PtX = r\x + r\w + 2 : PtY = r\y + r\h - 2
+        Case 3 : PtX = r\x + r\w - 2 : PtY = r\y + r\h + 2
+      EndSelect
+      PtClicked$ = "" : Neon_FocusID = 0
+      If Left(name$, 4) = "tab " : Tab = 99 : EndIf   ; no tab selected: a press shows as the new value
+    Case 3 : PtDown = 1                          ; press
+    Case 4 : PtDown = 0                          ; release
+    Case 6                                       ; what the press did
+      PtRect(name$, @r)
+      inside = Bool(PtPoint < 2)
+      If Left(name$, 4) = "tab "
+        got$ = "tab " + Str(Tab)
+        ok = Bool((got$ = name$) = inside)
+      ElseIf name$ = "address field"
+        got$ = "focus " + Str(Neon_FocusID)
+        ok = Bool((Neon_FocusID = 501) = inside)
+      Else
+        got$ = PtClicked$
+        If got$ = "" : got$ = "nothing" : EndIf
+        ok = Bool((PtClicked$ = name$) = inside)
+      EndIf
+      PtPoints + 1
+      PtLog$ + StringField("FAIL|ok", 1 + ok, "|") + "  " + LSet(name$, 22) + " rect (" + StrF(r\x, 1) + "," + StrF(r\y, 1) + " " +
+               StrF(r\w, 1) + "x" + StrF(r\h, 1) + ")  point (" + StrF(PtX, 0) + "," + StrF(PtY, 0) + ") " +
+               StringField("outside|inside", 1 + inside, "|") + "  read back (" + StrF(Neon_MX, 1) + "," + StrF(Neon_MY, 1) + ")  press -> " + got$ + #LF$
+      If ok = 0 : PtFails + 1 : EndIf
+      If Left(name$, 4) = "tab " : Tab = 0 : EndIf
+      PtPoint + 1 : PtFrame = 0
+      If PtPoint = 4 : PtPoint = 0 : PtCase + 1 : EndIf
+  EndSelect
 EndProcedure
 
 Procedure SaveShot(path$)
@@ -380,6 +522,7 @@ For k = 0 To CountProgramParameters() - 1
   If LCase(Left(arg$, 5)) = "shot:" : Shot$ = Mid(arg$, 6)
   ElseIf LCase(arg$) = "tests" : RunTestsAtStart = 1
   ElseIf LCase(arg$) = "run" : RunAtStart = 1
+  ElseIf LCase(arg$) = "--pointer-test" : PtOn = 1 : k + 1 : PtFile$ = ProgramParameter(k)
   Else : ProgramFile$ = arg$
   EndIf
 Next
@@ -407,17 +550,16 @@ If Gl = 0
 EndIf
 Win = Util_MainWindowID
 Trace("window")
-s = DisplayScale(Win)
-Neon_UIScale = s
-*Neon_FontUI    = Neon_CreateFontPx("Segoe UI", Round(14 * s, #PB_Round_Nearest))
-*Neon_FontSmall = Neon_CreateFontPx("Segoe UI", Round(12 * s, #PB_Round_Nearest))
-*Neon_FontBold  = Neon_CreateFontPx("Segoe UI", Round(15 * s, #PB_Round_Nearest), #PB_Font_Bold)
-*Neon_FontMono  = Neon_CreateFontPx("Consolas", Round(14 * s, #PB_Round_Nearest))
-*FontBig        = Neon_CreateFontPx("Segoe UI", Round(20 * s, #PB_Round_Nearest), #PB_Font_Bold)
-GLFontSetSnapToPixel(*Neon_FontUI, #True) : GLFontSetSnapToPixel(*Neon_FontSmall, #True)
-GLFontSetSnapToPixel(*Neon_FontBold, #True) : GLFontSetSnapToPixel(*Neon_FontMono, #True)
-GLFontSetSnapToPixel(*FontBig, #True)
-Trace("fonts")
+; the frame is not drawn through DrawRetroCRT: with the CRT on (the engine's default) every pointer
+; position is bent by the barrel curve, up to 28 px at 125%, worst at the top and bottom
+UI_UseCRT = #False
+CompilerIf Defined(PLANT_CRT, #PB_Constant)
+  UI_UseCRT = #True   ; only to see --pointer-test fail
+CompilerEndIf
+ResizeGadget(Gl, 0, 0, WindowWidth(Win, #PB_Window_InnerCoordinate), WindowHeight(Win, #PB_Window_InnerCoordinate))
+GetClientRect_(WindowID(Win), @r)
+ScaleFonts(Round((r\right - r\left) * 100.0 / WindowWidth(Win, #PB_Window_InnerCoordinate), #PB_Round_Nearest) / 100.0)
+Trace("fonts, scale " + StrF(Neon_UIScale, 2))
 AddKeyboardShortcut(Win, #PB_Shortcut_F5, 2001)
 AddKeyboardShortcut(Win, #PB_Shortcut_F10, 2002)
 SetActiveGadget(Gl)
@@ -428,6 +570,7 @@ LoadProgram(ProgramFile$)
 ResetCpu()
 Worker = CreateThread(@Worker(), 0)
 If RunTestsAtStart : RunTests() : Tab = 1 : EndIf
+If PtOn : PtInit() : EndIf
 Trace("program loaded")
 If RunAtStart : Running = 1 : SpeedT0 = ElapsedMilliseconds() : EndIf
 lastMs = ElapsedMilliseconds()
@@ -464,7 +607,7 @@ Repeat
           EndSelect
         EndIf
       Case #PB_Event_SizeWindow
-        ResizeGadget(Gl, 0, 0, WindowWidth(Win), WindowHeight(Win))
+        ResizeGadget(Gl, 0, 0, WindowWidth(Win, #PB_Window_InnerCoordinate), WindowHeight(Win, #PB_Window_InnerCoordinate))
     EndSelect
   Until e = 0
   If StepReq
@@ -474,21 +617,30 @@ Repeat
     UnlockMutex(CpuLock)
   EndIf
 
-  ; a 1:1 canvas: the physical client size (the engine's checklist, item 4)
+  ; a 1:1 canvas (the engine's GlUIChrome.pbi sections 4 and 5a): the canvas and the viewport are the
+  ; physical client size, Util_Win* the logical one as measured, s their ratio; no GL_HandleResize
   ; NOT SetGadgetAttribute(Gl, #PB_OpenGL_SetContext) here: one context, made current once by
   ; OpenGLWindow on this thread, and wglMakeCurrent costs 8-80 ms a call on this PC.
-  cw = GadgetWidth(Gl) : ch = GadgetHeight(Gl)
+  cw = WindowWidth(Win, #PB_Window_InnerCoordinate) : ch = WindowHeight(Win, #PB_Window_InnerCoordinate)
   GetClientRect_(WindowID(Win), @r)
   pw = r\right - r\left : ph = r\bottom - r\top
   If pw < 1 : pw = 1 : EndIf
   If ph < 1 : ph = 1 : EndIf
+  If cw < 1 : cw = 1 : EndIf
+  If ch < 1 : ch = 1 : EndIf
+  ScaleFonts(Round(pw * 100.0 / cw, #PB_Round_Nearest) / 100.0)
   Util_BaseWidth = pw : Util_BaseHeight = ph
   Util_WinWidth = cw : Util_WinHeight = ch
   GL_ViewportX = 0 : GL_ViewportY = 0 : GL_ViewportW = pw : GL_ViewportH = ph
   dt = (ElapsedMilliseconds() - lastMs) / 1000.0 : lastMs = ElapsedMilliseconds()
   ; the frame reads (and its buttons change) the CPU state: under the lock, for the ~1 ms it draws
   UiWants = 1 : LockMutex(CpuLock) : UiWants = 0
-  Neon_ChromeBeginFrame(WindowMouseX(Win), WindowMouseY(Win), mouseDown, wheel, keyCode, keyChar, dt)
+  If PtOn
+    Neon_ChromeBeginFrame(PtX, PtY, PtDown, 0, 0, 0, dt)   ; --pointer-test: the real pointer is not read
+  Else
+    ; WindowMouseX/Y as they are: already physical pixels in a DPI-aware window
+    Neon_ChromeBeginFrame(WindowMouseX(Win), WindowMouseY(Win), mouseDown, wheel, keyCode, keyChar, dt)
+  EndIf
   glBindFramebuffer(#GL_FRAMEBUFFER, 0)
   glDisable_(#GL_SCISSOR_TEST)
   glViewport_(0, 0, pw, ph)
@@ -496,6 +648,10 @@ Repeat
   glClear_(#GL_COLOR_BUFFER_BIT)
   DrawFrame(pw, ph)
   Neon_ChromeEndFrame()
+  If PtOn
+    PtStep()
+    If PtDone : quit = 1 : EndIf
+  EndIf
   UnlockMutex(CpuLock)
   SetGadgetAttribute(Gl, #PB_OpenGL_FlipBuffers, #True)
   If ShotFrames < 3 Or ShotFrames % 30 = 0 : Trace("frame " + Str(ShotFrames) + " cycles " + Str(CpuCycles)) : EndIf
@@ -514,4 +670,5 @@ Repeat
 Until quit
 WorkerQuit = 1 : Running = 0
 If Worker : WaitThread(Worker) : EndIf
+If PtOn : End PtFails : EndIf
 End
