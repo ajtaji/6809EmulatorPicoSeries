@@ -5,6 +5,7 @@
 ; ones the Pico W runs (desktop/testsuite.pbi).
 ;
 ;   m6809.exe [program.s19] [tests] [run] [shot:<file.png>] [--pointer-test <log>]
+;             [--fullscreen-test <log> [<file.png>]]
 ;
 ; Loads an S-record (asm6809 -S) program - W. Schwotzer's validation program
 ; by default - with RAM everywhere and page $FF as I/O: a byte written to
@@ -14,6 +15,10 @@
 ;
 ; "tests" runs the suites at start, "run" starts the program; "shot:<file>" draws a few frames, saves
 ; the window as a PNG and exits (how the window is checked without a person).
+;
+; The keys are in desktop/controls.pbi, one table read by the keyboard code, the Controls tab and the
+; READMEs. Full screen (the button or F11; Esc leaves) shows only the machine's screen: its output port
+; as an 80 x 25 terminal at 4:3, centred on the window's own monitor. "--fullscreen-test <log>" checks it.
 ;
 ; "--pointer-test <log>" checks that the pointer and the controls agree at the display's scale without
 ; touching the real pointer: the chrome is driven with synthetic positions (see the end of this file's
@@ -37,6 +42,7 @@ XIncludeFile #GL_ENGINE_DIR$ + "GlUI.pbi"
 XIncludeFile #GL_ENGINE_DIR$ + "GlUIChrome.pbi"
 XIncludeFile "cpu6809.pbi"
 XIncludeFile "testsuite.pbi"
+XIncludeFile "controls.pbi"
 
 ; ---------------------------------------------------------------- state
 Global NewList LogLines.s()
@@ -51,6 +57,7 @@ Global TraceT0.q, TraceFile.i
 Global Shot$, ShotFrames.i, RunTestsAtStart.i, RunAtStart.i
 Global *FontBig.GLFont
 Global DisStart.i
+Global FullScreen.i          ; full screen (below); F11 and the Full screen button toggle it, Esc leaves
 Global PtOn.i, PtClicked$   ; --pointer-test: on, and the control a synthetic press landed on
 
 ; Where each control was last drawn, in canvas units (physical pixels), for --pointer-test.
@@ -285,12 +292,18 @@ Procedure DrawMemory(x.f, y.f, w.f, h.f)
   Next
 EndProcedure
 
-Procedure DrawOutput(x.f, y.f, w.f, h.f)
-  Protected text$ = "", k.i, lines.i, yy.f, line$, rowH.f = Neon_S(20)
-  Neon_Panel(x, y, w, h, "Output  ($FF00)", Neon_C_AmbR, Neon_C_AmbG, Neon_C_AmbB, Neon_S(26))
+; What the program wrote to $FF00, as text
+Procedure.s OutputText()
+  Protected text$ = "", k.i
   For k = 0 To CapLen - 1
     If Cap(k) = 10 : text$ + #LF$ : ElseIf Cap(k) >= 32 : text$ + Chr(Cap(k)) : EndIf
   Next
+  ProcedureReturn text$
+EndProcedure
+
+Procedure DrawOutput(x.f, y.f, w.f, h.f)
+  Protected text$ = OutputText(), k.i, lines.i, yy.f, line$, rowH.f = Neon_S(20)
+  Neon_Panel(x, y, w, h, "Output  ($FF00)", Neon_C_AmbR, Neon_C_AmbG, Neon_C_AmbB, Neon_S(26))
   lines = CountString(text$, #LF$) + 1
   yy = y + Neon_S(32)
   For k = 1 To lines
@@ -335,6 +348,170 @@ Procedure DrawTests(x.f, y.f, w.f, h.f)
   Neon_ListEnd()
 EndProcedure
 
+Declare SaveShot(path$)
+
+; ---------------------------------------------------------------- full screen
+; A borderless window over the window's own monitor (the display mode does not change), showing only
+; the machine's screen: what the program wrote to $FF00, as an 80 x 25 terminal at 4:3, as large as
+; fits, centred on black. The CPU goes on on its own thread exactly as in the window. The pointer
+; hides after two idle seconds. The window's placement and style are saved on entering and put back
+; exactly on leaving.
+#FS_COLS = 80
+#FS_ROWS = 25
+#FS_ASPECT = 4.0 / 3.0
+Global FsStyle.i, FsPlacement.WINDOWPLACEMENT, FsCursorHidden.i, FsMouseX.i, FsMouseY.i, FsMouseMs.q
+Global FsViewX.f, FsViewY.f, FsViewW.f, FsViewH.f, *FsFont.GLFont, FsFontFor.i
+
+Procedure FsShowCursor(show.i)
+  If show And FsCursorHidden : ShowCursor_(#True) : FsCursorHidden = 0 : EndIf
+  If show = 0 And FsCursorHidden = 0 : ShowCursor_(#False) : FsCursorHidden = 1 : EndIf
+EndProcedure
+
+Procedure EnterFullScreen()
+  Protected hwnd.i, mi.MONITORINFO
+  If FullScreen : ProcedureReturn : EndIf
+  hwnd = WindowID(Win)
+  FsPlacement\length = SizeOf(WINDOWPLACEMENT) : GetWindowPlacement_(hwnd, @FsPlacement)
+  FsStyle = GetWindowLongPtr_(hwnd, #GWL_STYLE)
+  mi\cbSize = SizeOf(MONITORINFO) : GetMonitorInfo_(MonitorFromWindow_(hwnd, 2), @mi)   ; 2: the nearest monitor
+  SetWindowLongPtr_(hwnd, #GWL_STYLE, FsStyle & ~(#WS_CAPTION | #WS_THICKFRAME | #WS_MINIMIZEBOX | #WS_MAXIMIZEBOX | #WS_SYSMENU))
+  SetWindowPos_(hwnd, #HWND_TOP, mi\rcMonitor\left, mi\rcMonitor\top, mi\rcMonitor\right - mi\rcMonitor\left, mi\rcMonitor\bottom - mi\rcMonitor\top, #SWP_FRAMECHANGED | #SWP_NOOWNERZORDER | #SWP_SHOWWINDOW)
+  FullScreen = 1 : FsMouseMs = ElapsedMilliseconds()
+  Neon_FocusID = 0
+  SetActiveGadget(Gl)
+EndProcedure
+
+Procedure LeaveFullScreen()
+  Protected hwnd.i
+  If FullScreen = 0 : ProcedureReturn : EndIf
+  hwnd = WindowID(Win)
+  SetWindowLongPtr_(hwnd, #GWL_STYLE, FsStyle)
+  SetWindowPlacement_(hwnd, @FsPlacement)
+  SetWindowPos_(hwnd, 0, 0, 0, 0, 0, #SWP_FRAMECHANGED | #SWP_NOMOVE | #SWP_NOSIZE | #SWP_NOZORDER | #SWP_NOOWNERZORDER)
+  FullScreen = 0 : FsShowCursor(1)
+  SetActiveGadget(Gl)
+EndProcedure
+
+; What a key or a button does (controls.pbi's actions)
+Procedure WindowAction(action.i)
+  Select action
+    Case #CTL_RUNPAUSE
+      Running ! 1
+      If Running : SpeedT0 = ElapsedMilliseconds() : SpeedCycles = 0 : Else : Speed$ = "paused" : EndIf
+    Case #CTL_STEP : StepReq = 1
+    Case #CTL_FULLSCREEN : If FullScreen : LeaveFullScreen() : Else : EnterFullScreen() : EndIf
+    Case #CTL_LEAVEFULL : LeaveFullScreen()
+  EndSelect
+EndProcedure
+
+; The terminal: the last 25 lines of the output, each wrapped at 80 columns, in a 4:3 box. The face is
+; built for the box's height (once per size), as large as lets 80 columns and 25 lines fit.
+Procedure DrawFullScreen(pw.f, ph.f)
+  Protected vw.f, vh.f, text$ = OutputText(), line$, k.i, n.i, size.i, cellW.f, yy.f, first.i, f.f
+  Protected NewList t.s()
+  Neon_Box(0, 0, pw, ph, 0.0, 0.0, 0.0)
+  vh = ph : vw = vh * #FS_ASPECT
+  If vw > pw : vw = pw : vh = vw / #FS_ASPECT : EndIf
+  FsViewW = vw : FsViewH = vh : FsViewX = (pw - vw) / 2 : FsViewY = (ph - vh) / 2
+  Neon_Box(FsViewX, FsViewY, FsViewW, FsViewH, 0.03, 0.05, 0.04)
+  If *FsFont = 0 Or FsFontFor <> Int(vh)
+    If *FsFont : FreeGLFont(*FsFont) : EndIf
+    size = Int(vh * 0.92 / #FS_ROWS)
+    *FsFont = Neon_CreateFontPx("Consolas", size)
+    cellW = GetGLTextWidth(*FsFont, LSet("", #FS_COLS, "M"))
+    If cellW > vw * 0.95 Or *FsFont\LineHeight * #FS_ROWS > vh * 0.95
+      f = vw * 0.95 / cellW
+      If vh * 0.95 / (*FsFont\LineHeight * #FS_ROWS) < f : f = vh * 0.95 / (*FsFont\LineHeight * #FS_ROWS) : EndIf
+      size = Int(size * f)
+      FreeGLFont(*FsFont) : *FsFont = Neon_CreateFontPx("Consolas", size)
+    EndIf
+    GLFontSetSnapToPixel(*FsFont, #True)
+    FsFontFor = Int(vh)
+  EndIf
+  n = CountString(text$, #LF$) + 1
+  For k = 1 To n
+    line$ = StringField(text$, k, #LF$)
+    Repeat
+      AddElement(t()) : t() = Left(line$, #FS_COLS) : line$ = Mid(line$, #FS_COLS + 1)
+    Until line$ = ""
+  Next
+  first = ListSize(t()) - #FS_ROWS
+  cellW = GetGLTextWidth(*FsFont, LSet("", #FS_COLS, "M"))
+  yy = FsViewY + (vh - *FsFont\LineHeight * #FS_ROWS) / 2
+  k = 0
+  ForEach t()
+    If k >= first
+      Neon_Text(*FsFont, FsViewX + (vw - cellW) / 2, yy, t(), 0.45, 0.95, 0.55)
+      yy + *FsFont\LineHeight
+    EndIf
+    k + 1
+  Next
+EndProcedure
+
+; ---------------------------------------------------------------- --fullscreen-test
+; Full screen by its own keys, no real pointer: Esc, F11, Esc posted to the window's GL gadget (the
+; keyboard shortcuts take them there, as from the keyboard). Checked: Esc in the window does nothing,
+; F11 enters, the window covers its monitor, the canvas is the monitor, the terminal has its 4:3 shape
+; and is centred, the CPU runs on in full screen, Esc leaves, the windowed rectangle and style come back.
+Global FtOn.i, FtFile$, FtShot$, FtStep.i, FtWait.i, FtFails.i, FtLog$, FtDone.i, FtRect.RECT, FtStyle.i, FtCycles.q
+
+Procedure FtCheck(ok.i, what$)
+  If ok = 0 : FtFails + 1 : FtLog$ + "FAIL " : Else : FtLog$ + "ok   " : EndIf
+  FtLog$ + what$ + #LF$
+EndProcedure
+
+Procedure FtKey(vk.i)
+  PostMessage_(GadgetID(Gl), #WM_KEYDOWN, vk, 0) : PostMessage_(GadgetID(Gl), #WM_KEYUP, vk, 0)
+EndProcedure
+
+Procedure FtTick(pw.i, ph.i)
+  Protected r.RECT, mi.MONITORINFO, hwnd.i = WindowID(Win), f.i
+  FtWait + 1 : If FtWait < 40 : ProcedureReturn : EndIf
+  FtWait = 0 : FtStep + 1
+  Select FtStep
+    Case 1
+      GetWindowRect_(hwnd, @FtRect) : FtStyle = GetWindowLongPtr_(hwnd, #GWL_STYLE)
+      FtLog$ + "windowed: " + Str(FtRect\left) + "," + Str(FtRect\top) + " " + Str(FtRect\right - FtRect\left) + "x" + Str(FtRect\bottom - FtRect\top) + ", scale " + StrF(Neon_UIScale, 2) + #LF$
+      FtKey(#VK_ESCAPE)
+    Case 2
+      FtCheck(Bool(FullScreen = 0), "Esc in the window does nothing (the program goes on, still windowed)")
+      FtKey(#VK_F11)
+    Case 3
+      GetWindowRect_(hwnd, @r) : mi\cbSize = SizeOf(MONITORINFO) : GetMonitorInfo_(MonitorFromWindow_(hwnd, 2), @mi)
+      FtCheck(FullScreen, "F11 entered full screen")
+      FtCheck(Bool(r\left = mi\rcMonitor\left And r\top = mi\rcMonitor\top And r\right = mi\rcMonitor\right And r\bottom = mi\rcMonitor\bottom), "the window covers its monitor " + Str(mi\rcMonitor\right - mi\rcMonitor\left) + "x" + Str(mi\rcMonitor\bottom - mi\rcMonitor\top))
+      FtCheck(Bool(pw = mi\rcMonitor\right - mi\rcMonitor\left And ph = mi\rcMonitor\bottom - mi\rcMonitor\top), "the canvas is the whole monitor (" + Str(pw) + "x" + Str(ph) + ")")
+      FtCheck(Bool(Abs(FsViewW / FsViewH - #FS_ASPECT) < 0.002 And FsViewW <= pw And FsViewH <= ph And (FsViewW = pw Or FsViewH = ph)), "the terminal " + StrF(FsViewW, 1) + "x" + StrF(FsViewH, 1) + " is 4:3 (" + StrF(FsViewW / FsViewH, 4) + ") and as large as fits")
+      FtCheck(Bool(Abs(FsViewX * 2 + FsViewW - pw) <= 1 And Abs(FsViewY * 2 + FsViewH - ph) <= 1), "the terminal is centred at " + StrF(FsViewX, 1) + "," + StrF(FsViewY, 1))
+      FtCheck(Bool(*FsFont And GetGLTextWidth(*FsFont, LSet("", #FS_COLS, "M")) <= FsViewW And *FsFont\LineHeight * #FS_ROWS <= FsViewH), "80 columns and 25 lines fit in it")
+      If FtShot$ <> "" : SaveShot(FtShot$) : EndIf
+      FtCycles = CpuCycles
+    Case 4
+      FtCheck(Bool(Running And CpuCycles > FtCycles), "the CPU runs on in full screen (" + Str(CpuCycles - FtCycles) + " cycles in 40 frames)")
+      FtKey(#VK_ESCAPE)
+    Case 5
+      GetWindowRect_(hwnd, @r)
+      FtCheck(Bool(FullScreen = 0), "Esc left full screen")
+      FtCheck(Bool(r\left = FtRect\left And r\top = FtRect\top And r\right = FtRect\right And r\bottom = FtRect\bottom), "the windowed rectangle came back: " + Str(r\left) + "," + Str(r\top) + " " + Str(r\right - r\left) + "x" + Str(r\bottom - r\top))
+      FtCheck(Bool(GetWindowLongPtr_(hwnd, #GWL_STYLE) = FtStyle), "the window's frame and style came back")
+      FtCheck(Bool(Abs(pw * 1.0 / WindowWidth(Win, #PB_Window_InnerCoordinate) - Neon_UIScale) < 0.01), "the scale is re-measured: " + StrF(Neon_UIScale, 2))
+      FtLog$ + "fullscreen-test: " + Str(FtFails) + " failures" + #LF$
+      f = CreateFile(#PB_Any, FtFile$) : If f : WriteString(f, FtLog$) : CloseFile(f) : EndIf
+      FtDone = 1
+  EndSelect
+EndProcedure
+
+; The Controls tab: desktop/controls.pbi's table, the one the keyboard code reads
+Global ControlsTop.i
+Procedure DrawControls(x.f, y.f, w.f, h.f)
+  Neon_Panel(x, y, w, h, "Controls  (the machine has no keyboard: every key is the window's own)", Neon_C_AccR, Neon_C_AccG, Neon_C_AccB, Neon_S(26))
+  Neon_ListBegin(602, x + Neon_S(12), y + Neon_S(36), w - Neon_S(24), h - Neon_S(48), Neon_S(26), @ControlsTop)
+  ForEach CtlRows()
+    Neon_ListItem(LSet(CtlRows()\keys$, 28) + CtlRows()\what$)
+  Next
+  Neon_ListEnd()
+EndProcedure
+
 Procedure DrawFrame(pw.i, ph.i)
   Protected top.f = Neon_S(8), bh.f = Neon_S(30), bx.f = Neon_S(12), gap.f = Neon_S(8), file$
   Neon_Text(*FontBig, bx, top + Neon_S(2), "MC6809", Neon_C_AccR, Neon_C_AccG, Neon_C_AccB)
@@ -353,10 +530,12 @@ Procedure DrawFrame(pw.i, ph.i)
   EndIf
   bx + Neon_S(80) + gap
   If Btn("Step", bx, top, Neon_S(80), bh, "Step") : StepReq = 1 : EndIf
-  bx + Neon_S(80) + gap * 3
+  bx + Neon_S(80) + gap
+  If Btn("Full screen", bx, top, Neon_S(130), bh, "Full screen  F11") : WindowAction(#CTL_FULLSCREEN) : EndIf
+  bx + Neon_S(130) + gap * 3
   Neon_Text(*Neon_FontSmall, bx, top + Neon_S(7), "F5 run/pause   F10 step   " + GetFilePart(ProgramFile$), Neon_C_FaintR, Neon_C_FaintG, Neon_C_FaintB)
   Protected ty.f = top + bh + Neon_S(10)
-  Tab = Neon_TabStrip(700, Neon_S(12), ty, pw - Neon_S(24), Neon_S(28), "Debugger|Tests", Tab)
+  Tab = Neon_TabStrip(700, Neon_S(12), ty, pw - Neon_S(24), Neon_S(28), "Debugger|Tests|Controls", Tab)
   Protected y.f = ty + Neon_S(36), h.f = ph - y - Neon_S(12), w.f = pw - Neon_S(24)
   If Tab = 0
     Protected lw.f = Neon_S(320), mw.f = (w - lw - gap * 2) * 0.48, rw.f = w - lw - mw - gap * 2
@@ -364,6 +543,8 @@ Procedure DrawFrame(pw.i, ph.i)
     DrawOutput(Neon_S(12), y + Neon_S(300) + gap, lw, h - Neon_S(300) - gap)
     DrawDisassembly(Neon_S(12) + lw + gap, y, mw, h)
     DrawMemory(Neon_S(12) + lw + gap + mw + gap, y, rw, h)
+  ElseIf Tab = 2
+    DrawControls(Neon_S(12), y, w, h)
   Else
     DrawTests(Neon_S(12), y, w, h)
   EndIf
@@ -401,7 +582,7 @@ Global PtLog$, PtFile$, PtX.f, PtY.f, PtDown.i, PtCase.i, PtPoint.i, PtFrame.i, 
 Global PtCount.i, Dim PtName$(20)
 
 Procedure PtInit()
-  Protected n$ = "Load S19|Reset|Run|Step|tab 0|tab 1|address field|disassembly row 2|disassembly last row|Run all suites|log first row|log last row"
+  Protected n$ = "Load S19|Reset|Run|Step|Full screen|tab 0|tab 1|tab 2|address field|disassembly row 2|disassembly last row|Run all suites|log first row|log last row"
   Protected i.i
   PtCount = CountString(n$, "|") + 1
   For i = 0 To PtCount - 1 : PtName$(i) = StringField(n$, i + 1, "|") : Next
@@ -523,6 +704,9 @@ For k = 0 To CountProgramParameters() - 1
   ElseIf LCase(arg$) = "tests" : RunTestsAtStart = 1
   ElseIf LCase(arg$) = "run" : RunAtStart = 1
   ElseIf LCase(arg$) = "--pointer-test" : PtOn = 1 : k + 1 : PtFile$ = ProgramParameter(k)
+  ElseIf LCase(arg$) = "--fullscreen-test"
+    FtOn = 1 : RunAtStart = 1 : k + 1 : FtFile$ = ProgramParameter(k)
+    If k + 1 < CountProgramParameters() And LCase(Right(ProgramParameter(k + 1), 4)) = ".png" : k + 1 : FtShot$ = ProgramParameter(k) : EndIf
   Else : ProgramFile$ = arg$
   EndIf
 Next
@@ -560,8 +744,13 @@ ResizeGadget(Gl, 0, 0, WindowWidth(Win, #PB_Window_InnerCoordinate), WindowHeigh
 GetClientRect_(WindowID(Win), @r)
 ScaleFonts(Round((r\right - r\left) * 100.0 / WindowWidth(Win, #PB_Window_InnerCoordinate), #PB_Round_Nearest) / 100.0)
 Trace("fonts, scale " + StrF(Neon_UIScale, 2))
-AddKeyboardShortcut(Win, #PB_Shortcut_F5, 2001)
-AddKeyboardShortcut(Win, #PB_Shortcut_F10, 2002)
+; the keys: every one in controls.pbi's table, as a shortcut whose menu number is 3000 + the key. The
+; engine's own Esc shortcut (which ended the program) is replaced: Esc only leaves full screen.
+CtlLoad()
+RemoveKeyboardShortcut(Win, #PB_Shortcut_Escape)
+ForEach CtlRows()
+  If CtlRows()\key >= 0 : AddKeyboardShortcut(Win, CtlRows()\key, 3000 + CtlRows()\key) : EndIf
+Next
 SetActiveGadget(Gl)
 If GetEnvironmentVariable("M6809_NOVSYNC") : GL_SetVSync(0) : Else : GL_SetVSync(1) : EndIf
 
@@ -582,13 +771,11 @@ Repeat
     Select e
       Case #PB_Event_CloseWindow : quit = 1
       Case #PB_Event_Menu
-        Select EventMenu()
-          Case 1001 : quit = 1
-          Case 2001
-            Running ! 1
-            If Running : SpeedT0 = ElapsedMilliseconds() : SpeedCycles = 0 : Else : Speed$ = "paused" : EndIf
-          Case 2002 : StepReq = 1
-        EndSelect
+        If EventMenu() >= 3000 And EventMenu() < 3256
+          UiWants = 1 : LockMutex(CpuLock) : UiWants = 0
+          WindowAction(CtlFind(EventMenu() - 3000, FullScreen))
+          UnlockMutex(CpuLock)
+        EndIf
       Case #PB_Event_Gadget
         If EventGadget() = Gl
           Select EventType()
@@ -638,6 +825,12 @@ Repeat
   If PtOn
     Neon_ChromeBeginFrame(PtX, PtY, PtDown, 0, 0, 0, dt)   ; --pointer-test: the real pointer is not read
   Else
+    If FullScreen                ; the pointer hides after two idle seconds, shows on a move
+      If WindowMouseX(Win) <> FsMouseX Or WindowMouseY(Win) <> FsMouseY
+        FsMouseX = WindowMouseX(Win) : FsMouseY = WindowMouseY(Win) : FsMouseMs = ElapsedMilliseconds() : FsShowCursor(1)
+      EndIf
+      If ElapsedMilliseconds() - FsMouseMs > 2000 : FsShowCursor(0) : EndIf
+    EndIf
     ; WindowMouseX/Y as they are: already physical pixels in a DPI-aware window
     Neon_ChromeBeginFrame(WindowMouseX(Win), WindowMouseY(Win), mouseDown, wheel, keyCode, keyChar, dt)
   EndIf
@@ -646,7 +839,7 @@ Repeat
   glViewport_(0, 0, pw, ph)
   glClearColor_(Neon_C_BgR, Neon_C_BgG, Neon_C_BgB, 1.0)
   glClear_(#GL_COLOR_BUFFER_BIT)
-  DrawFrame(pw, ph)
+  If FullScreen : DrawFullScreen(pw, ph) : Else : DrawFrame(pw, ph) : EndIf
   Neon_ChromeEndFrame()
   If PtOn
     PtStep()
@@ -654,6 +847,10 @@ Repeat
   EndIf
   UnlockMutex(CpuLock)
   SetGadgetAttribute(Gl, #PB_OpenGL_FlipBuffers, #True)
+  If FtOn
+    FtTick(pw, ph)
+    If FtDone : quit = 1 : EndIf
+  EndIf
   If ShotFrames < 3 Or ShotFrames % 30 = 0 : Trace("frame " + Str(ShotFrames) + " cycles " + Str(CpuCycles)) : EndIf
 
   If Shot$
@@ -670,5 +867,7 @@ Repeat
 Until quit
 WorkerQuit = 1 : Running = 0
 If Worker : WaitThread(Worker) : EndIf
+If FullScreen : LeaveFullScreen() : EndIf
 If PtOn : End PtFails : EndIf
+If FtOn : End FtFails : EndIf
 End

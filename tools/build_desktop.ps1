@@ -20,6 +20,8 @@ if (-not (Test-Path (Join-Path $Engine 'GlUI.pbi'))) {
 $engine = ((Resolve-Path $Engine).Path -replace '\\', '/').TrimEnd('/') + '/'
 New-Item -ItemType Directory -Force desktop\build | Out-Null
 & py -3 tools\generate.py | Out-Null
+& py -3 tools\controls_readme.py --check
+if ($LASTEXITCODE) { throw 'the READMEs'' Controls section is not what desktop\controls.pbi gives: py -3 tools\controls_readme.py' }
 foreach ($t in 1, 0) {
     & $pb /OPTIMIZER /CONSOLE /CONSTANT "CPU_TIMING=$t" /OUTPUT "desktop\build\verify_$t.exe" desktop\verify_console.pb
     if ($LASTEXITCODE) { throw "verify_console.pb (CPU_TIMING=$t) did not build" }
