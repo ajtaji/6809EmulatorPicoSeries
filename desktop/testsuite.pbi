@@ -13,7 +13,7 @@ Global Dim Mem.a(65536)
 Global Dim Cap.a(4096)
 Global CapLen.i, CaptureMode.i
 Global IoReads.i, IoWrites.i, IoLastAdr.i, IoLastVal.i, IoRaiseIrq.i
-Global TestRoot$                     ; the repository folder (ends in \)
+Global TestRoot$                     ; the repository folder (ends in the path separator)
 Global LoadStart.i = -1              ; an S9 record's start address, -1 if none
 
 Procedure.i CpuBusRead(addr.i)
@@ -348,9 +348,9 @@ EndProcedure
 Procedure.i SchwotzerTest()
   Protected total.i, t0.i, ok.i, i.i, text$
   For i = 0 To 65535 : Mem(i) = 0 : Next
-  If LoadS19(TestRoot$ + "Diagnostics\schwotzer.s19") <= 0
-    ; third-party, not in the repository: tools\fetch_schwotzer.ps1 adds it
-    Report("Schwotzer validation SKIPPED: Diagnostics\schwotzer.s19 not present (see tools\fetch_schwotzer.ps1)")
+  If LoadS19(TestRoot$ + "Diagnostics/schwotzer.s19") <= 0
+    ; third-party, not in the repository: tools/fetch_schwotzer.ps1 adds it
+    Report("Schwotzer validation SKIPPED: Diagnostics/schwotzer.s19 not present (see tools/fetch_schwotzer.ps1)")
     ProcedureReturn 1
   EndIf
   CpuMapPages(0, 256, @Mem(0), 1)
@@ -426,7 +426,7 @@ Procedure.i RunAllSuites()
   For k = 1 To 4
     b$ = StringField("b c d i", k, " ")
     cases = 0 : ms = 0
-    fails = RunVectorFile(TestRoot$ + "Diagnostics\vectors_" + b$ + ".pmi", @cases, @ms)
+    fails = RunVectorFile(TestRoot$ + "Diagnostics/vectors_" + b$ + ".pmi", @cases, @ms)
     If fails = 0
       Report("vectors " + b$ + ": " + Str(cases) + " cases PASS (" + Str(ms) + " ms)")
     ElseIf fails > 0
@@ -439,12 +439,12 @@ Procedure.i RunAllSuites()
   If SchwotzerTest() = 0 : total + 1 : EndIf
   k = DisasmCheck()
   If k > 0 : total + 1 : EndIf
-  If k < 0 : Report("disassembler check SKIPPED: Diagnostics\schwotzer.lst not present (see tools\fetch_schwotzer.ps1)") : EndIf
+  If k < 0 : Report("disassembler check SKIPPED: Diagnostics/schwotzer.lst not present (see tools/fetch_schwotzer.ps1)") : EndIf
   ProcedureReturn total
 EndProcedure
 
 ; ---- the disassembler against asm6809's own listing of the Schwotzer program ----
-; Every instruction line of Diagnostics\schwotzer.lst (address, bytes, mnemonic) must
+; Every instruction line of Diagnostics/schwotzer.lst (address, bytes, mnemonic) must
 ; disassemble to the same mnemonic and length. Returns the mismatches, -1 without the listing.
 Procedure.s DisNorm(m$)
   m$ = UCase(m$)
@@ -462,9 +462,9 @@ EndProcedure
 Procedure.i DisasmCheck()
   Protected f.i, line$, adr.i, bytes$, src$, mn$, got$, n.i, bad.i, shown.i
   For n = 0 To 65535 : Mem(n) = 0 : Next
-  If LoadS19(TestRoot$ + "Diagnostics\schwotzer.s19") <= 0 : ProcedureReturn -1 : EndIf
+  If LoadS19(TestRoot$ + "Diagnostics/schwotzer.s19") <= 0 : ProcedureReturn -1 : EndIf
   CpuMapPages(0, 256, @Mem(0), 1)
-  f = ReadFile(#PB_Any, TestRoot$ + "Diagnostics\schwotzer.lst")
+  f = ReadFile(#PB_Any, TestRoot$ + "Diagnostics/schwotzer.lst")
   If f = 0 : ProcedureReturn -1 : EndIf
   n = 0
   While Eof(f) = 0

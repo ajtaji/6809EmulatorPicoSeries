@@ -19,7 +19,7 @@ If FileSize(TestRoot$ + "Diagnostics") <> -2
   TestRoot$ = GetCurrentDirectory()
 EndIf
 If FileSize(TestRoot$ + "Diagnostics") <> -2
-  TestRoot$ = GetPathPart(RTrim(GetPathPart(ProgramFilename()), "\")) ; desktop\build\.. layouts
+  TestRoot$ = GetPathPart(RTrim(GetPathPart(ProgramFilename()), #PS$)) ; desktop/build/.. layouts
 EndIf
 failures = RunAllSuites()
 Benchmarks(100000000)
