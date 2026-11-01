@@ -61,6 +61,7 @@ Global MemAddr$ = "3000", MemCaret.i
 Global TestsRan.i, TestFailures.i = -1
 Global TraceT0.q, TraceFile.i
 Global Shot$, ShotFrames.i, RunTestsAtStart.i, RunAtStart.i
+Global ShotPath$             ; a PNG to save from the frame being drawn (SaveShot, before the flip)
 Global *FontBig.GLFont
 Global DisStart.i
 Global FullScreen.i          ; full screen (below); F11 and the Full screen button toggle it, Esc leaves
@@ -483,7 +484,7 @@ Procedure FtTick(pw.i, ph.i)
       FtCheck(Bool(Abs(FsViewW / FsViewH - #FS_ASPECT) < 0.002 And FsViewW <= pw And FsViewH <= ph And (FsViewW = pw Or FsViewH = ph)), "the terminal " + StrF(FsViewW, 1) + "x" + StrF(FsViewH, 1) + " is 4:3 (" + StrF(FsViewW / FsViewH, 4) + ") and as large as fits")
       FtCheck(Bool(Abs(FsViewX * 2 + FsViewW - pw) <= 1 And Abs(FsViewY * 2 + FsViewH - ph) <= 1), "the terminal is centred at " + StrF(FsViewX, 1) + "," + StrF(FsViewY, 1))
       FtCheck(Bool(*FsFont And GetGLTextWidth(*FsFont, LSet("", #FS_COLS, "M")) <= FsViewW And *FsFont\LineHeight * #FS_ROWS <= FsViewH), "80 columns and 25 lines fit in it")
-      If FtShot$ <> "" : SaveShot(FtShot$) : EndIf
+      If FtShot$ <> "" : ShotPath$ = FtShot$ : EndIf   ; taken from the next frame, still full screen
       FtCycles = CpuCycles
     Case 4
       FtCheck(Bool(Running And CpuCycles > FtCycles), "the CPU runs on in full screen (" + Str(CpuCycles - FtCycles) + " cycles in 40 frames)")
@@ -666,11 +667,14 @@ Procedure PtStep()
   EndSelect
 EndProcedure
 
+; The frame just drawn, read from the BACK buffer before the flip (ShotPath$, taken in the main loop):
+; what the front buffer holds after a swap is undefined, and under a compositing X server (WSLg) it
+; reads back black.
 Procedure SaveShot(path$)
   Protected w.i = GL_ViewportW, h.i = GL_ViewportH, img.i, x.i, y.i, *buf, *px.Ascii
   UsePNGImageEncoder()
   *buf = AllocateMemory(w * h * 4)
-  glReadBuffer_(#GL_FRONT)
+  glReadBuffer_(#GL_BACK)
   glPixelStorei_(#GL_PACK_ALIGNMENT, 1)
   glReadPixels_(0, 0, w, h, #GL_RGBA, #GL_UNSIGNED_BYTE, *buf)
   img = CreateImage(#PB_Any, w, h, 32)
@@ -773,7 +777,7 @@ Repeat
             Case #PB_EventType_LeftButtonUp : mouseDown = 0
             Case #PB_EventType_MouseWheel : wheel + GetGadgetAttribute(Gl, #PB_OpenGL_WheelDelta)
             Case #PB_EventType_KeyDown
-              Select GetGadgetAttribute(Gl, #PB_OpenGL_Key)
+              Select GL_KeyEventCode(GetGadgetAttribute(Gl, #PB_OpenGL_Key))   ; (the engine's: the same code on both OSes)
                 Case #PB_Shortcut_Back : keyCode = #PB_Shortcut_Back
                 Case #PB_Shortcut_Return : keyCode = #PB_Shortcut_Return
                 Case #PB_Shortcut_Left : keyCode = #PB_Shortcut_Left
@@ -835,6 +839,17 @@ Repeat
     If PtDone : quit = 1 : EndIf
   EndIf
   UnlockMutex(CpuLock)
+  If Shot$
+    ShotFrames + 1
+    If ShotFrames = 8 + 82 * RunAtStart   ; a running capture waits for the speed reading
+      ShotPath$ = Shot$ : quit = 1
+    EndIf
+  EndIf
+  If ShotPath$                            ; before the flip: the back buffer holds this frame
+    Trace("shot start")
+    SaveShot(ShotPath$) : ShotPath$ = ""
+    Trace("shot saved")
+  EndIf
   SetGadgetAttribute(Gl, #PB_OpenGL_FlipBuffers, #True)
   If FtOn
     FtTick(pw, ph)
@@ -842,15 +857,7 @@ Repeat
   EndIf
   If ShotFrames < 3 Or ShotFrames % 30 = 0 : Trace("frame " + Str(ShotFrames) + " cycles " + Str(CpuCycles)) : EndIf
 
-  If Shot$
-    ShotFrames + 1
-    If ShotFrames = 8 + 82 * RunAtStart   ; a running capture waits for the speed reading
-      Trace("shot start")
-      SaveShot(Shot$)
-      Trace("shot saved")
-      quit = 1
-    EndIf
-  ElseIf Running = 0
+  If Shot$ = "" And Running = 0
     Delay(10)
   EndIf
 Until quit

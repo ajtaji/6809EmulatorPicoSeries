@@ -122,7 +122,7 @@ for about five seconds).
 |---|---|---|
 | Build | yes | yes |
 | Suites, timed and untimed (27,000 + 4,000 vectors, API checks) | ALL PASS | ALL PASS, same counts |
-| Window opens and draws (`shot:`) | yes | yes, under WSLg (engine 061f525 or later: before it no OpenGL gadget opened under WSLg) |
+| Window opens and draws (`shot:`) | yes | yes, under WSLg, hardware GL and llvmpipe, the same picture (engine 061f525 or later: before it no OpenGL gadget opened under WSLg) |
 | `--pointer-test` | 56 of 56 points | 56 of 56 points |
 | `--fullscreen-test` (F11 / Esc through the key handler) | 0 failures | 0 failures |
 | Keys from the real keyboard | not checked by a program | not checked by a program (injected keys do not reach a WSLg window) |
