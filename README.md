@@ -8,7 +8,8 @@ every handler — no procedure call per emulated instruction — and on the RP23
 its dispatch and branches are Cortex-M33 Thumb-2. Memory goes through 256-byte
 page tables, so a machine can map RAM, ROM, write-protected and I/O pages (an
 MMU such as the Tandy CoCo 3's GIME) without slowing plain RAM. The same core
-also builds for Windows as a PureBasic program with a debugger window.
+also builds for Windows and Linux, from one source, as a PureBasic program with a
+debugger window.
 
 It is verified on silicon against 31,000 one-instruction cases with exact cycle
 counts, interrupt and bus checks, and a full 6809 validation program.
@@ -41,6 +42,7 @@ counts, interrupt and bus checks, and a full 6809 validation program.
 | Raspberry Pi Pico W | RP2040 (Cortex-M0+, Thumb-1) at 200 MHz | `src/cpu6809.pico` | yes — all suites |
 | Raspberry Pi Pico 2 W, Pimoroni Pico Plus 2 W, Adafruit Feather RP2350 | RP2350 (Cortex-M33, Thumb-2) at 150 MHz | `src/cpu6809.pico2` | yes — all suites (Pico 2 W and Feather RP2350) |
 | Windows x64 | PureBasic 6.41 C back end | `desktop/cpu6809.pbi` | yes — all suites in the console and the window |
+| Linux x64 | PureBasic 6.41 for Linux, C back end | `desktop/cpu6809.pbi` | yes — all suites under WSL Ubuntu, timed and untimed, the same counts as Windows (27,000 + 4,000 vectors, API checks); the window draws under WSLg |
 
 This repository is the CPU; it drives no display or sound itself. A machine
 built on it puts the CPU on core 0 and its video and sound on core 1 — the
@@ -204,7 +206,7 @@ Results on silicon, all twelve configurations on both chips: **all PASS** —
 
 ## Desktop version
 
-[desktop/](desktop/README.md) has the same core for Windows (PureBasic 6.41,
+[desktop/](desktop/README.md) has the same core for Windows and Linux (PureBasic 6.41,
 C back end, labels-as-values dispatch), a console test runner that passes the
 same suites, a disassembler, and a debugger window drawn with the
 [Neon Arcade Display Engine](https://github.com/ajtaji/Neon-Arcade-Dispay-Engine):
@@ -249,6 +251,17 @@ Run it from the repository folder:
 ```powershell
 desktop\bin\m6809.exe [program.s19] [tests] [run]
 ```
+
+On Linux (PureBasic 6.41 for Linux; GTK 3, Mesa GL, X11), from the same folder:
+
+```sh
+export PUREBASIC_HOME=<the PureBasic folder>
+sh desktop/build.sh
+```
+
+This builds and runs both verifiers and builds the window into `desktop/build/m6809`
+(same arguments). Under WSL, copy both repositories to the Linux disk first, not
+`/mnt/c`. See [desktop/README.md](desktop/README.md).
 
 ### Controls
 
